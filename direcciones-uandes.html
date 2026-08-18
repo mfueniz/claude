@@ -1,0 +1,412 @@
+<!-- =========================================
+     DIRECCIONES UANDES
+     Grilla responsive con hover institucional
+========================================== -->
+
+<style>
+  .uandes-direcciones {
+    --uandes-rojo: #CE0019;
+    --uandes-oscuro: #131E29;
+    --uandes-gris: #D6D1CA;
+    --uandes-blanco: #FFFFFF;
+    --uandes-fuente: "DM Sans", Arial, sans-serif;
+    --uandes-peso: 500;
+    --uandes-gap: 16px;
+
+    width: 100%;
+    margin: 0 auto;
+    padding: 16px;
+    font-family: var(--uandes-fuente);
+    background-color: var(--uandes-blanco);
+    border: 0;
+  }
+
+  .uandes-direcciones,
+  .uandes-direcciones *,
+  .uandes-direcciones *::before,
+  .uandes-direcciones *::after {
+    box-sizing: border-box;
+  }
+
+  /* Título oculto para accesibilidad */
+
+  .uandes-direcciones__sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* =========================================
+     GRILLA
+  ========================================== */
+
+  .uandes-direcciones__grid {
+    display: grid;
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    gap: 30px 16px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .uandes-direcciones__item {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* =========================================
+     TARJETAS
+  ========================================== */
+
+  .uandes-direcciones__card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-width: 0;
+    min-height: 114px;
+    margin: 0;
+    padding: 16px 12px;
+
+    color: var(--uandes-oscuro);
+    font-family: var(--uandes-fuente);
+    font-size: 12px;
+    font-weight: var(--uandes-peso);
+    line-height: 1.45;
+    text-align: center;
+    text-wrap: balance;
+    text-decoration: none;
+
+    background-color: var(--uandes-blanco);
+    border: 2px solid var(--uandes-rojo);
+    border-radius: 12px;
+
+    transition:
+      color 0.22s ease,
+      background-color 0.22s ease,
+      border-color 0.22s ease;
+  }
+
+  /* Tarjetas que sí tienen enlace */
+
+  .uandes-direcciones__card--link {
+    cursor: pointer;
+  }
+
+  .uandes-direcciones__card--link:hover,
+  .uandes-direcciones__card--link:focus-visible,
+  .uandes-direcciones__card--link:active {
+    color: var(--uandes-blanco);
+    background-color: var(--uandes-rojo);
+    border-color: var(--uandes-rojo);
+    text-decoration: none;
+  }
+
+  .uandes-direcciones__card--link:focus-visible {
+    outline: 3px solid rgba(206, 0, 25, 0.3);
+    outline-offset: 3px;
+  }
+
+  /* Tarjetas sin enlace: conservan su apariencia normal */
+
+  .uandes-direcciones__card--static {
+    cursor: default;
+  }
+
+  .uandes-direcciones__card--static:hover,
+  .uandes-direcciones__card--static:active {
+    color: var(--uandes-oscuro);
+    background-color: var(--uandes-blanco);
+    border-color: var(--uandes-rojo);
+  }
+
+  /* Evita modificaciones heredadas de WordPress */
+
+  .uandes-direcciones__card p,
+  .uandes-direcciones__card span {
+    margin: 0;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+    text-align: inherit;
+  }
+
+  /* =========================================
+     PANTALLAS MEDIANAS
+  ========================================== */
+
+  @media (max-width: 1350px) {
+    .uandes-direcciones__grid {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 1050px) {
+    .uandes-direcciones__grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 20px 16px;
+    }
+  }
+
+  /* =========================================
+     TABLET
+  ========================================== */
+
+  @media (max-width: 767px) {
+    .uandes-direcciones {
+      padding: 14px;
+    }
+
+    .uandes-direcciones__grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .uandes-direcciones__card {
+      min-height: 108px;
+      padding: 14px 10px;
+      font-size: 14px;
+      line-height: 1.4;
+      border-radius: 10px;
+    }
+  }
+
+  /* =========================================
+     MOBILE
+  ========================================== */
+
+  @media (max-width: 560px) {
+    .uandes-direcciones {
+      padding: 12px;
+    }
+
+    .uandes-direcciones__grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .uandes-direcciones__card {
+      min-height: 112px;
+      padding: 14px 9px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+  }
+
+  /* Mobile muy pequeño */
+
+  @media (max-width: 340px) {
+    .uandes-direcciones__grid {
+      grid-template-columns: 1fr;
+    }
+
+    .uandes-direcciones__card {
+      min-height: 92px;
+    }
+  }
+
+  /* =========================================
+     DISPOSITIVOS TÁCTILES
+  ========================================== */
+
+  @media (hover: none) {
+    .uandes-direcciones__card--link:active {
+      color: var(--uandes-blanco);
+      background-color: var(--uandes-rojo);
+      border-color: var(--uandes-rojo);
+    }
+
+    .uandes-direcciones__card--static:active {
+      color: var(--uandes-oscuro);
+      background-color: var(--uandes-blanco);
+      border-color: var(--uandes-rojo);
+    }
+  }
+
+  /* =========================================
+     REDUCCIÓN DE MOVIMIENTO
+  ========================================== */
+
+  @media (prefers-reduced-motion: reduce) {
+    .uandes-direcciones__card {
+      transition: none;
+    }
+  }
+
+  /* =========================================
+     CORRECCIÓN DE BORDES EN WORDPRESS
+  ========================================== */
+
+  .uandes-direcciones {
+    border: 0 !important;
+    box-shadow: none !important;
+    outline: 0 !important;
+  }
+
+  .uandes-direcciones
+  .uandes-direcciones__grid
+  > .uandes-direcciones__item
+  > .uandes-direcciones__card {
+    color: #131E29 !important;
+    font-weight: 500 !important;
+    background-color: #FFFFFF !important;
+    border: 2px solid #CE0019 !important;
+    border-radius: 12px !important;
+    box-shadow: inset 0 0 0 1px #CE0019 !important;
+    text-decoration: none !important;
+  }
+
+  /* Hover aplicado exclusivamente a tarjetas con enlace */
+
+  .uandes-direcciones
+  .uandes-direcciones__grid
+  > .uandes-direcciones__item
+  > .uandes-direcciones__card--link:hover,
+  .uandes-direcciones
+  .uandes-direcciones__grid
+  > .uandes-direcciones__item
+  > .uandes-direcciones__card--link:focus-visible,
+  .uandes-direcciones
+  .uandes-direcciones__grid
+  > .uandes-direcciones__item
+  > .uandes-direcciones__card--link:active {
+    color: #FFFFFF !important;
+    background-color: #CE0019 !important;
+    border-color: #CE0019 !important;
+    box-shadow: inset 0 0 0 1px #CE0019 !important;
+  }
+
+  /* Las tarjetas sin enlace permanecen blancas */
+
+  .uandes-direcciones
+  .uandes-direcciones__grid
+  > .uandes-direcciones__item
+  > .uandes-direcciones__card--static:hover,
+  .uandes-direcciones
+  .uandes-direcciones__grid
+  > .uandes-direcciones__item
+  > .uandes-direcciones__card--static:active {
+    color: #131E29 !important;
+    background-color: #FFFFFF !important;
+    border-color: #CE0019 !important;
+    box-shadow: inset 0 0 0 1px #CE0019 !important;
+  }
+
+  /* El texto hereda correctamente los colores y el grosor */
+
+  .uandes-direcciones
+  .uandes-direcciones__card
+  span {
+    color: inherit !important;
+    font-weight: inherit !important;
+  }
+</style>
+
+<section class="uandes-direcciones" aria-labelledby="uandes-direcciones-title">
+  <h2 id="uandes-direcciones-title" class="uandes-direcciones__sr-only">
+    Direcciones y unidades de la Universidad de los Andes
+  </h2>
+
+  <ul class="uandes-direcciones__grid">
+
+    <!-- Con enlace -->
+
+    <li class="uandes-direcciones__item">
+      <a class="uandes-direcciones__card uandes-direcciones__card--link" href="https://www.uandes.cl/estudiantes/vida-universitaria/#equipo-y-contacto">
+        <span>Dirección de Vida Universitaria</span>
+      </a>
+    </li>
+
+    <!-- Con enlace -->
+
+    <li class="uandes-direcciones__item">
+      <a class="uandes-direcciones__card uandes-direcciones__card--link" href="https://www.uandes.cl/biblioteca/quienes-somos/">
+        <span>Dirección de Biblioteca</span>
+      </a>
+    </li>
+
+    <!-- Con enlace -->
+
+    <li class="uandes-direcciones__item">
+      <a class="uandes-direcciones__card uandes-direcciones__card--link" href="https://www.uandes.cl/investigacion-y-doctorado/quienes-somos/">
+        <span>Dirección de Investigación y Doctorado</span>
+      </a>
+    </li>
+
+    <!-- Sin enlace -->
+
+    <li class="uandes-direcciones__item">
+      <div class="uandes-direcciones__card uandes-direcciones__card--static">
+        <span>Dirección de Procesos y Servicios Académicos</span>
+      </div>
+    </li>
+
+    <!-- Con enlace -->
+
+    <li class="uandes-direcciones__item">
+      <a class="uandes-direcciones__card uandes-direcciones__card--link" href="https://www.uandes.cl/direccion-de-aseguramiento-de-la-calidad/">
+        <span>Dirección de Aseguramiento a la Calidad</span>
+      </a>
+    </li>
+
+    <!-- Sin enlace -->
+
+    <li class="uandes-direcciones__item">
+      <div class="uandes-direcciones__card uandes-direcciones__card--static">
+        <span>Dirección de Investigación e Innovación Biomédica</span>
+      </div>
+    </li>
+
+    <!-- Con enlace -->
+
+    <li class="uandes-direcciones__item">
+      <a class="uandes-direcciones__card uandes-direcciones__card--link" href="https://www.uandes.cl/estudiantes/apoyo-academico/">
+        <span>Dirección de Apoyo Académico</span>
+      </a>
+    </li>
+
+    <!-- Con enlace -->
+
+    <li class="uandes-direcciones__item">
+      <a class="uandes-direcciones__card uandes-direcciones__card--link" href="https://www.uandes.cl/internacional/contacto/">
+        <span>Dirección de Relaciones Internacionales</span>
+      </a>
+    </li>
+
+   <!-- Dirección de Innovación -->
+
+<li class="uandes-direcciones__item">
+  <a class="uandes-direcciones__card uandes-direcciones__card--link" href="https://www.uandes.cl/investigacion-e-innovacion/innovacion/">
+    <span>Dirección de Innovación</span>
+  </a>
+</li>
+
+<!-- Dirección de Desarrollo Académico -->
+
+<li class="uandes-direcciones__item">
+  <a class="uandes-direcciones__card uandes-direcciones__card--link" href="https://www.uandes.cl/academicos/direccion-de-desarrollo-academico/">
+    <span>Dirección de Desarrollo Académico</span>
+  </a>
+</li>
+
+<!-- Centro de Salud Universidad de los Andes -->
+
+<li class="uandes-direcciones__item">
+  <a class="uandes-direcciones__card uandes-direcciones__card--link" href="https://saluduandes.cl/">
+    <span>Centro de Salud Universidad de los Andes</span>
+  </a>
+</li>
+
+  </ul>
+</section>
