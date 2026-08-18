@@ -1,0 +1,494 @@
+<!-- =========================================
+     UNIDADES DE APOYO ADMINISTRATIVO UANDES
+     Código independiente y responsive
+========================================== -->
+
+<style>
+  .uandes-admin-v2 {
+    --uandes-admin-v2-rojo: #CE0019;
+    --uandes-admin-v2-oscuro: #131E29;
+    --uandes-admin-v2-blanco: #FFFFFF;
+    --uandes-admin-v2-gris: #D6D1CA;
+    --uandes-admin-v2-fuente: "DM Sans", Arial, sans-serif;
+    --uandes-admin-v2-peso: 500;
+
+    width: 100%;
+    margin: 0 auto;
+    padding: 16px;
+    font-family: var(--uandes-admin-v2-fuente);
+    background-color: var(--uandes-admin-v2-blanco);
+
+    /* Sin borde en el contenedor */
+
+    border: 0 !important;
+    box-shadow: none !important;
+    outline: 0 !important;
+  }
+
+  .uandes-admin-v2,
+  .uandes-admin-v2 *,
+  .uandes-admin-v2 *::before,
+  .uandes-admin-v2 *::after {
+    box-sizing: border-box;
+  }
+
+  /* Título accesible oculto visualmente */
+
+  .uandes-admin-v2__sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+  }
+
+  /* =========================================
+     GRILLA
+     grid-auto-rows: 1fr iguala la altura de
+     todas las filas de tarjetas.
+  ========================================== */
+
+  .uandes-admin-v2__grid {
+    display: grid;
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    grid-auto-rows: 1fr;
+    align-items: stretch;
+    gap: 30px 16px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* El item se estira a la altura de la fila
+     y la tarjeta ocupa todo ese alto. */
+
+  .uandes-admin-v2__item {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* =========================================
+     TARJETAS
+  ========================================== */
+
+  .uandes-admin-v2
+  .uandes-admin-v2__grid
+  > .uandes-admin-v2__item
+  > .uandes-admin-v2__card {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    min-height: 114px !important;
+    margin: 0 !important;
+    padding: 16px 12px !important;
+
+    color: var(--uandes-admin-v2-oscuro) !important;
+    font-family: var(--uandes-admin-v2-fuente) !important;
+    font-size: 12px !important;
+    font-weight: var(--uandes-admin-v2-peso) !important;
+    line-height: 1.45 !important;
+    text-align: center !important;
+    text-decoration: none !important;
+
+    background-color: var(--uandes-admin-v2-blanco) !important;
+    border: 2px solid var(--uandes-admin-v2-rojo) !important;
+    border-radius: 12px !important;
+
+    /*
+     * Respaldo para mantener la línea roja aunque
+     * el tema de WordPress intente eliminar el borde.
+     */
+
+    box-shadow:
+      inset 0 0 0 1px var(--uandes-admin-v2-rojo) !important;
+
+    transition:
+      color 0.22s ease,
+      background-color 0.22s ease,
+      border-color 0.22s ease,
+      box-shadow 0.22s ease,
+      transform 0.22s ease !important;
+  }
+
+  .uandes-admin-v2__card-text {
+    display: block;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: inherit !important;
+    font: inherit !important;
+    font-weight: inherit !important;
+    line-height: inherit !important;
+    text-align: inherit !important;
+    text-wrap: balance;
+  }
+
+  /* Tarjetas con enlace */
+
+  .uandes-admin-v2__card--link {
+    cursor: pointer;
+  }
+
+  /* Tarjetas sin enlace */
+
+  .uandes-admin-v2__card--static {
+    cursor: default;
+  }
+
+  /* =========================================
+     HOVER PARA TARJETAS CON ENLACE
+  ========================================== */
+
+  .uandes-admin-v2
+  .uandes-admin-v2__grid
+  > .uandes-admin-v2__item
+  > .uandes-admin-v2__card--link:hover,
+  .uandes-admin-v2
+  .uandes-admin-v2__grid
+  > .uandes-admin-v2__item
+  > .uandes-admin-v2__card--link:focus-visible,
+  .uandes-admin-v2
+  .uandes-admin-v2__grid
+  > .uandes-admin-v2__item
+  > .uandes-admin-v2__card--link:active {
+    color: var(--uandes-admin-v2-blanco) !important;
+    background-color: var(--uandes-admin-v2-rojo) !important;
+    border-color: var(--uandes-admin-v2-rojo) !important;
+    text-decoration: none !important;
+
+    box-shadow:
+      inset 0 0 0 1px var(--uandes-admin-v2-rojo) !important;
+  }
+
+  .uandes-admin-v2
+  .uandes-admin-v2__grid
+  > .uandes-admin-v2__item
+  > .uandes-admin-v2__card--link:hover {
+    transform: translateY(-2px);
+  }
+
+  .uandes-admin-v2
+  .uandes-admin-v2__grid
+  > .uandes-admin-v2__item
+  > .uandes-admin-v2__card--link:focus-visible {
+    outline: 3px solid rgba(206, 0, 25, 0.25) !important;
+    outline-offset: 3px !important;
+  }
+
+  /* =========================================
+     TARJETAS SIN ENLACE
+     Permanecen blancas y sin hover
+  ========================================== */
+
+  .uandes-admin-v2
+  .uandes-admin-v2__grid
+  > .uandes-admin-v2__item
+  > .uandes-admin-v2__card--static:hover,
+  .uandes-admin-v2
+  .uandes-admin-v2__grid
+  > .uandes-admin-v2__item
+  > .uandes-admin-v2__card--static:active {
+    color: var(--uandes-admin-v2-oscuro) !important;
+    background-color: var(--uandes-admin-v2-blanco) !important;
+    border-color: var(--uandes-admin-v2-rojo) !important;
+    transform: none !important;
+
+    box-shadow:
+      inset 0 0 0 1px var(--uandes-admin-v2-rojo) !important;
+  }
+
+  /* =========================================
+     PANTALLAS MEDIANAS
+  ========================================== */
+
+  @media (max-width: 1350px) {
+    .uandes-admin-v2__grid {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 1050px) {
+    .uandes-admin-v2__grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 20px 16px;
+    }
+  }
+
+  /* =========================================
+     TABLET
+  ========================================== */
+
+  @media (max-width: 767px) {
+    .uandes-admin-v2 {
+      padding: 14px;
+    }
+
+    .uandes-admin-v2__grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .uandes-admin-v2
+    .uandes-admin-v2__grid
+    > .uandes-admin-v2__item
+    > .uandes-admin-v2__card {
+      min-height: 108px !important;
+      padding: 14px 10px !important;
+      font-size: 14px !important;
+      line-height: 1.4 !important;
+      border-radius: 10px !important;
+    }
+  }
+
+  /* =========================================
+     MOBILE
+  ========================================== */
+
+  @media (max-width: 560px) {
+    .uandes-admin-v2 {
+      padding: 12px;
+    }
+
+    .uandes-admin-v2__grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .uandes-admin-v2
+    .uandes-admin-v2__grid
+    > .uandes-admin-v2__item
+    > .uandes-admin-v2__card {
+      min-height: 112px !important;
+      padding: 14px 9px !important;
+      font-size: 14px !important;
+    }
+  }
+
+  @media (max-width: 340px) {
+    .uandes-admin-v2__grid {
+      grid-template-columns: 1fr;
+    }
+
+    .uandes-admin-v2
+    .uandes-admin-v2__grid
+    > .uandes-admin-v2__item
+    > .uandes-admin-v2__card {
+      min-height: 92px !important;
+    }
+  }
+
+  /* =========================================
+     DISPOSITIVOS TÁCTILES
+  ========================================== */
+
+  @media (hover: none) {
+    .uandes-admin-v2
+    .uandes-admin-v2__grid
+    > .uandes-admin-v2__item
+    > .uandes-admin-v2__card--link:hover {
+      color: var(--uandes-admin-v2-oscuro) !important;
+      background-color: var(--uandes-admin-v2-blanco) !important;
+      transform: none !important;
+    }
+
+    .uandes-admin-v2
+    .uandes-admin-v2__grid
+    > .uandes-admin-v2__item
+    > .uandes-admin-v2__card--link:active {
+      color: var(--uandes-admin-v2-blanco) !important;
+      background-color: var(--uandes-admin-v2-rojo) !important;
+    }
+
+    .uandes-admin-v2
+    .uandes-admin-v2__grid
+    > .uandes-admin-v2__item
+    > .uandes-admin-v2__card--static:active {
+      color: var(--uandes-admin-v2-oscuro) !important;
+      background-color: var(--uandes-admin-v2-blanco) !important;
+    }
+  }
+
+  /* =========================================
+     REDUCCIÓN DE MOVIMIENTO
+  ========================================== */
+
+  @media (prefers-reduced-motion: reduce) {
+    .uandes-admin-v2
+    .uandes-admin-v2__grid
+    > .uandes-admin-v2__item
+    > .uandes-admin-v2__card {
+      transition: none !important;
+    }
+  }
+</style>
+
+<section class="uandes-admin-v2" aria-labelledby="uandes-admin-v2-title">
+  <h2 id="uandes-admin-v2-title" class="uandes-admin-v2__sr-only">
+    Unidades de apoyo administrativo de la Universidad de los Andes
+  </h2>
+
+  <div class="uandes-admin-v2__grid" role="list">
+
+    <!-- Con enlace -->
+
+    <div class="uandes-admin-v2__item" role="listitem">
+      <a class="uandes-admin-v2__card uandes-admin-v2__card--link" href="https://admision.uandes.cl/">
+        <span class="uandes-admin-v2__card-text">
+          Dirección de Admisión y Promoción de Pregrado
+        </span>
+      </a>
+    </div>
+
+    <!-- Con enlace -->
+
+    <div class="uandes-admin-v2__item" role="listitem">
+      <a class="uandes-admin-v2__card uandes-admin-v2__card--link" href="https://www.uandes.cl/direccion-de-planificacion-y-desarrollo/">
+        <span class="uandes-admin-v2__card-text">
+          Dirección de Planificación y Desarrollo
+        </span>
+      </a>
+    </div>
+
+    <!-- Sin enlace -->
+
+    <div class="uandes-admin-v2__item" role="listitem">
+      <div class="uandes-admin-v2__card uandes-admin-v2__card--static">
+        <span class="uandes-admin-v2__card-text">
+          Dirección de Cultura Corporativa
+        </span>
+      </div>
+    </div>
+
+    <!-- Con enlace -->
+
+    <div class="uandes-admin-v2__item" role="listitem">
+      <a class="uandes-admin-v2__card uandes-admin-v2__card--link" href="https://www.uandes.cl/comunicaciones-uandes/direccion-de-comunicaciones/">
+        <span class="uandes-admin-v2__card-text">
+          Dirección de Comunicaciones
+        </span>
+      </a>
+    </div>
+
+    <!-- Con enlace -->
+
+    <div class="uandes-admin-v2__item" role="listitem">
+      <a class="uandes-admin-v2__card uandes-admin-v2__card--link" href="https://www.uandes.cl/extension/">
+        <span class="uandes-admin-v2__card-text">
+          Dirección de Extensión Cultural
+        </span>
+      </a>
+    </div>
+
+    <!-- Sin enlace -->
+
+    <div class="uandes-admin-v2__item" role="listitem">
+      <div class="uandes-admin-v2__card uandes-admin-v2__card--static">
+        <span class="uandes-admin-v2__card-text">
+          Dirección de Finanzas
+        </span>
+      </div>
+    </div>
+
+    <!-- Sin enlace -->
+
+    <div class="uandes-admin-v2__item" role="listitem">
+      <div class="uandes-admin-v2__card uandes-admin-v2__card--static">
+        <span class="uandes-admin-v2__card-text">
+          Dirección de Operaciones
+        </span>
+      </div>
+    </div>
+
+    <!-- Con enlace -->
+
+    <div class="uandes-admin-v2__item" role="listitem">
+      <a class="uandes-admin-v2__card uandes-admin-v2__card--link" href="https://www.uandes.cl/filantropia-y-donaciones/nosotros/">
+        <span class="uandes-admin-v2__card-text">
+          Dirección de Avance Institucional
+        </span>
+      </a>
+    </div>
+
+    <!-- Con enlace -->
+
+    <div class="uandes-admin-v2__item" role="listitem">
+      <a class="uandes-admin-v2__card uandes-admin-v2__card--link" href="https://www.uandes.cl/direccion-de-personas/">
+        <span class="uandes-admin-v2__card-text">
+          Dirección de Personas
+        </span>
+      </a>
+    </div>
+
+    <!-- Con enlace -->
+
+    <div class="uandes-admin-v2__item" role="listitem">
+      <a class="uandes-admin-v2__card uandes-admin-v2__card--link" href="https://www.uandes.cl/comunicaciones-uandes/imagen-corporativa/">
+        <span class="uandes-admin-v2__card-text">
+          Dirección de Imagen Corporativa
+        </span>
+      </a>
+    </div>
+
+    <!-- Sin enlace -->
+
+    <div class="uandes-admin-v2__item" role="listitem">
+      <div class="uandes-admin-v2__card uandes-admin-v2__card--static">
+        <span class="uandes-admin-v2__card-text">
+          Dirección de Sistemas y Tecnologías de Información
+        </span>
+      </div>
+    </div>
+
+    <!-- Con enlace -->
+
+    <div class="uandes-admin-v2__item" role="listitem">
+      <a class="uandes-admin-v2__card uandes-admin-v2__card--link" href="https://postgrados.uandes.cl/">
+        <span class="uandes-admin-v2__card-text">
+          Dirección de Admisión de Postgrado y Educación Continua
+        </span>
+      </a>
+    </div>
+
+    <!-- Sin enlace -->
+
+    <div class="uandes-admin-v2__item" role="listitem">
+      <div class="uandes-admin-v2__card uandes-admin-v2__card--static">
+        <span class="uandes-admin-v2__card-text">
+          Dirección de Experiencia de Postgrado y Educación Continua
+        </span>
+      </div>
+    </div>
+
+    <!-- Con enlace -->
+
+    <div class="uandes-admin-v2__item" role="listitem">
+      <a class="uandes-admin-v2__card uandes-admin-v2__card--link" href="https://alumni.uandes.cl/">
+        <span class="uandes-admin-v2__card-text">
+          Dirección de Alumni Uandes
+        </span>
+      </a>
+    </div>
+
+    <!-- Con enlace -->
+
+    <div class="uandes-admin-v2__item" role="listitem">
+      <a class="uandes-admin-v2__card uandes-admin-v2__card--link" href="https://www.uandes.cl/universidad/nosotros/pastoral/">
+        <span class="uandes-admin-v2__card-text">
+          Pastoral Uandes
+        </span>
+      </a>
+    </div>
+
+  </div>
+</section>
