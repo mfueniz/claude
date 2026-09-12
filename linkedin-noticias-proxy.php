@@ -398,7 +398,7 @@ function rcec_li_construir( $titulo, $contenido, $enlace, $fecha, $imagen, $guid
 		return null;
 	}
 
-	$marca = $fecha ? strtotime( $fecha ) : 0;
+	$marca = rcec_li_a_marca( $fecha );
 
 	return array(
 		'titulo'    => $titulo_final,
@@ -411,6 +411,35 @@ function rcec_li_construir( $titulo, $contenido, $enlace, $fecha, $imagen, $guid
 		'imagen'    => esc_url_raw( $imagen ),
 		'guid'      => $guid ? $guid : md5( $enlace . $titulo_final ),
 	);
+}
+
+/**
+ * Interpreta una fecha en cualquiera de los formatos que llegan.
+ *
+ * Cada origen entrega la fecha a su manera: ISO 8601, RFC 2822, segundos
+ * desde epoch o milisegundos. Los milisegundos son los traicioneros: se
+ * parecen a una fecha válida y colocarían la publicación en el año 57000.
+ *
+ * @param string|int $fecha Fecha en formato desconocido.
+ * @return int Marca de tiempo Unix, o 0 si no se pudo interpretar.
+ */
+function rcec_li_a_marca( $fecha ) {
+
+	if ( empty( $fecha ) ) {
+		return 0;
+	}
+
+	if ( is_numeric( $fecha ) ) {
+		$numero = (float) $fecha;
+
+		// Más de 10^11 solo puede ser milisegundos: como segundos daría
+		// una fecha más allá del año 5138.
+		return (int) ( $numero > 100000000000 ? round( $numero / 1000 ) : $numero );
+	}
+
+	$marca = strtotime( (string) $fecha );
+
+	return $marca ? $marca : 0;
 }
 
 /**
@@ -1057,10 +1086,18 @@ add_action(
 
 					$cuerpo = $peticion->get_json_params();
 
-					if ( ! is_array( $cuerpo ) ) {
+					// Aceptamos también datos de formulario. El texto de una
+					// publicación trae comillas y saltos de línea, y armar JSON
+					// a mano en una herramienta visual es donde más se falla:
+					// así ese error deja de ser posible.
+					if ( ! is_array( $cuerpo ) || ! $cuerpo ) {
+						$cuerpo = $peticion->get_body_params();
+					}
+
+					if ( ! is_array( $cuerpo ) || ! $cuerpo ) {
 						return new WP_Error(
 							'rcec_li_cuerpo_invalido',
-							__( 'Se esperaba un cuerpo JSON.', 'rcec-li' ),
+							__( 'No llegó ninguna publicación. Envía JSON o datos de formulario.', 'rcec-li' ),
 							array( 'status' => 400 )
 						);
 					}

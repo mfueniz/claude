@@ -247,3 +247,4 @@ aparecen con el prefijo `[rcec-li]`.
 | `linkedin-noticias.html` | Bloque *HTML personalizado* en la página |
 | `linkedin-noticias-proxy.php` | `wp-content/mu-plugins/` |
 | `LINKEDIN-INSTRUCCIONES.md` | Referencia, no se sube a WordPress |
+| `MAKE-CONFIGURACION.md` | Guía paso a paso del modo `ingesta` con Make |
