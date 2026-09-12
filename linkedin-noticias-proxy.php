@@ -34,8 +34,20 @@ if ( ! defined( 'ABSPATH' ) ) {
    CONFIGURACIÓN — EDITA SOLO ESTE BLOQUE
 ========================================================== */
 
-/** URL del feed generado por el puente (RSS.app, Make, Zapier...). */
-define( 'RCEC_LI_FEED', 'PEGA-AQUI-LA-URL-DE-TU-FEED' );
+/**
+ * De dónde salen las publicaciones. Tres modos:
+ *
+ *   'api'     WordPress le pregunta directamente a LinkedIn.
+ *             Gratis y permanente, sin intermediarios. Requiere
+ *             aprobación de la Community Management API (2 a 4 semanas).
+ *
+ *   'ingesta' Un servicio externo (Make, n8n, lo que sea) empuja las
+ *             publicaciones a WordPress. No dependes de ningún proveedor
+ *             en particular: si cambias de puente, aquí no tocas nada.
+ *
+ *   'feed'    WordPress lee una URL de feed RSS o JSON.
+ */
+define( 'RCEC_LI_MODO', 'ingesta' );
 
 /** Minutos que se conserva la respuesta en caché antes de volver a consultar. */
 define( 'RCEC_LI_CACHE_MINUTOS', 30 );
@@ -46,14 +58,48 @@ define( 'RCEC_LI_CREAR_ENTRADAS', false );
 /** Con qué estado se crean esas entradas: 'publish' o 'draft'. */
 define( 'RCEC_LI_ESTADO_ENTRADAS', 'draft' );
 
+/* ---- Modo 'feed' ---------------------------------------- */
+
+/** URL del feed generado por el puente. */
+define( 'RCEC_LI_FEED', '' );
+
+/* ---- Modo 'api' ----------------------------------------- */
+
+/**
+ * Solo el número de tu organización. Lo ves en la URL del panel de
+ * administración de tu página: linkedin.com/company/12345678/admin/
+ */
+define( 'RCEC_LI_ORG_ID', '' );
+
+/** Client ID y Client Secret de tu app en developer.linkedin.com. */
+define( 'RCEC_LI_CLIENT_ID', '' );
+define( 'RCEC_LI_CLIENT_SECRET', '' );
+
+/**
+ * Versión de la API de LinkedIn, en formato AAAAMM. LinkedIn la exige
+ * y rechaza la petición si falta. Súbela una o dos veces al año.
+ */
+define( 'RCEC_LI_API_VERSION', '202506' );
+
+/* ---- Modo 'ingesta' -------------------------------------- */
+
+/**
+ * Contraseña compartida con el servicio que empuja las publicaciones.
+ * Invéntate una larga y aleatoria. Si queda vacía, la ingesta se
+ * rechaza siempre: nadie puede escribir sin ella.
+ */
+define( 'RCEC_LI_TOKEN_INGESTA', '' );
+
 /* =========================================================
    A PARTIR DE AQUÍ NO NECESITAS MODIFICAR NADA
 ========================================================== */
 
-const RCEC_LI_CPT       = 'noticia_linkedin';
-const RCEC_LI_META_GUID = '_rcec_li_guid';
-const RCEC_LI_CACHE_KEY = 'rcec_li_feed_cache';
-const RCEC_LI_CRON_HOOK = 'rcec_li_sincronizar';
+const RCEC_LI_CPT            = 'noticia_linkedin';
+const RCEC_LI_META_GUID      = '_rcec_li_guid';
+const RCEC_LI_CACHE_KEY      = 'rcec_li_feed_cache';
+const RCEC_LI_CRON_HOOK      = 'rcec_li_sincronizar';
+const RCEC_LI_OPCION_TOKEN   = 'rcec_li_token_linkedin';
+const RCEC_LI_OPCION_INGESTA = 'rcec_li_ingestadas';
 
 /**
  * Descarga el feed y lo devuelve ya normalizado.
@@ -74,9 +120,35 @@ function rcec_li_obtener_feed( $forzar = false ) {
 		}
 	}
 
+	// El modo 'ingesta' no consulta nada: las publicaciones ya llegaron
+	// empujadas y están guardadas. Se sirven tal cual.
+	if ( 'ingesta' === RCEC_LI_MODO ) {
+		$guardadas = get_option( RCEC_LI_OPCION_INGESTA );
+
+		if ( ! is_array( $guardadas ) || empty( $guardadas['items'] ) ) {
+			return new WP_Error(
+				'rcec_li_sin_ingesta',
+				__( 'Todavía no ha llegado ninguna publicación. Revisa que el servicio externo esté enviando al endpoint de ingesta.', 'rcec-li' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		return $guardadas;
+	}
+
+	if ( 'api' === RCEC_LI_MODO ) {
+		$items = rcec_li_obtener_desde_api();
+
+		if ( is_wp_error( $items ) ) {
+			return rcec_li_respaldo_o_error( $items );
+		}
+
+		return rcec_li_guardar_cache( $items );
+	}
+
 	$feed = RCEC_LI_FEED;
 
-	if ( empty( $feed ) || 0 === strpos( $feed, 'PEGA-AQUI' ) ) {
+	if ( empty( $feed ) ) {
 		return new WP_Error(
 			'rcec_li_sin_feed',
 			__( 'Falta configurar RCEC_LI_FEED en el archivo del plugin.', 'rcec-li' ),
@@ -94,22 +166,16 @@ function rcec_li_obtener_feed( $forzar = false ) {
 	);
 
 	if ( is_wp_error( $respuesta ) || 200 !== wp_remote_retrieve_response_code( $respuesta ) ) {
-		// El feed falló. Servimos la última copia guardada, sin importar su edad.
-		$respaldo = get_option( RCEC_LI_CACHE_KEY . '_respaldo' );
-		if ( is_array( $respaldo ) && ! empty( $respaldo['items'] ) ) {
-			$respaldo['obsoleto'] = true;
-			return $respaldo;
-		}
-
-		return new WP_Error(
-			'rcec_li_feed_inaccesible',
-			__( 'No se pudo leer el feed de LinkedIn.', 'rcec-li' ),
-			array( 'status' => 502 )
+		return rcec_li_respaldo_o_error(
+			new WP_Error(
+				'rcec_li_feed_inaccesible',
+				__( 'No se pudo leer el feed de LinkedIn.', 'rcec-li' ),
+				array( 'status' => 502 )
+			)
 		);
 	}
 
-	$cuerpo = wp_remote_retrieve_body( $respuesta );
-	$items  = rcec_li_parsear( $cuerpo );
+	$items = rcec_li_parsear( wp_remote_retrieve_body( $respuesta ) );
 
 	if ( empty( $items ) ) {
 		return new WP_Error(
@@ -119,17 +185,48 @@ function rcec_li_obtener_feed( $forzar = false ) {
 		);
 	}
 
+	return rcec_li_guardar_cache( $items );
+}
+
+/**
+ * Guarda en caché y deja un respaldo permanente.
+ *
+ * El respaldo es deliberado: sobrevive al vaciado de caché y permite
+ * seguir mostrando noticias cuando el origen deja de responder. Un panel
+ * desactualizado es mejor que uno vacío.
+ *
+ * @param array $items Publicaciones normalizadas.
+ * @return array
+ */
+function rcec_li_guardar_cache( $items ) {
+
 	$datos = array(
 		'actualizado' => time(),
 		'items'       => $items,
 	);
 
 	set_transient( RCEC_LI_CACHE_KEY, $datos, RCEC_LI_CACHE_MINUTOS * MINUTE_IN_SECONDS );
-
-	// Respaldo permanente: sobrevive al vaciado de caché y a los fallos del feed.
 	update_option( RCEC_LI_CACHE_KEY . '_respaldo', $datos, false );
 
 	return $datos;
+}
+
+/**
+ * Devuelve la última copia buena si existe; si no, el error recibido.
+ *
+ * @param WP_Error $error Error que motivó el respaldo.
+ * @return array|WP_Error
+ */
+function rcec_li_respaldo_o_error( $error ) {
+
+	$respaldo = get_option( RCEC_LI_CACHE_KEY . '_respaldo' );
+
+	if ( is_array( $respaldo ) && ! empty( $respaldo['items'] ) ) {
+		$respaldo['obsoleto'] = true;
+		return $respaldo;
+	}
+
+	return $error;
 }
 
 /**
@@ -529,6 +626,372 @@ function rcec_li_primer_valor( $datos, $claves ) {
 }
 
 /* =========================================================
+   MODO 'api' — WordPress le pregunta directamente a LinkedIn
+
+   Sin intermediarios y sin costo recurrente. A cambio, hay que
+   pedirle acceso a LinkedIn una vez (Community Management API).
+========================================================== */
+
+/**
+ * Trae las publicaciones de la organización desde la API oficial.
+ *
+ * @return array|WP_Error
+ */
+function rcec_li_obtener_desde_api() {
+
+	if ( ! RCEC_LI_ORG_ID ) {
+		return new WP_Error(
+			'rcec_li_sin_org',
+			__( 'Falta configurar RCEC_LI_ORG_ID.', 'rcec-li' ),
+			array( 'status' => 500 )
+		);
+	}
+
+	$token = rcec_li_token_valido();
+
+	if ( is_wp_error( $token ) ) {
+		return $token;
+	}
+
+	$url = add_query_arg(
+		array(
+			'q'      => 'author',
+			'author' => rawurlencode( 'urn:li:organization:' . RCEC_LI_ORG_ID ),
+			'count'  => 20,
+			'sortBy' => 'LAST_MODIFIED',
+		),
+		'https://api.linkedin.com/rest/posts'
+	);
+
+	$respuesta = wp_remote_get( $url, array( 'timeout' => 20, 'headers' => rcec_li_cabeceras_api( $token ) ) );
+
+	// Un 401 casi siempre significa token vencido. Lo renovamos y reintentamos
+	// una sola vez, para no entrar en un bucle si la credencial ya no sirve.
+	if ( ! is_wp_error( $respuesta ) && 401 === wp_remote_retrieve_response_code( $respuesta ) ) {
+		$token = rcec_li_renovar_token();
+
+		if ( is_wp_error( $token ) ) {
+			return $token;
+		}
+
+		$respuesta = wp_remote_get( $url, array( 'timeout' => 20, 'headers' => rcec_li_cabeceras_api( $token ) ) );
+	}
+
+	if ( is_wp_error( $respuesta ) ) {
+		return new WP_Error( 'rcec_li_api_red', $respuesta->get_error_message(), array( 'status' => 502 ) );
+	}
+
+	$codigo = wp_remote_retrieve_response_code( $respuesta );
+
+	if ( 200 !== $codigo ) {
+		return new WP_Error(
+			'rcec_li_api_error',
+			/* translators: %d: código HTTP devuelto por LinkedIn. */
+			sprintf( __( 'LinkedIn respondió %d. Revisa los permisos de la app y que el token siga vigente.', 'rcec-li' ), $codigo ),
+			array( 'status' => 502 )
+		);
+	}
+
+	$datos = json_decode( wp_remote_retrieve_body( $respuesta ), true );
+
+	if ( empty( $datos['elements'] ) ) {
+		return new WP_Error(
+			'rcec_li_api_vacio',
+			__( 'LinkedIn respondió sin publicaciones.', 'rcec-li' ),
+			array( 'status' => 502 )
+		);
+	}
+
+	$items = array();
+
+	foreach ( $datos['elements'] as $elemento ) {
+
+		if ( empty( $elemento['id'] ) ) {
+			continue;
+		}
+
+		// createdAt viene en milisegundos desde epoch.
+		$marca = isset( $elemento['createdAt'] ) ? (int) round( $elemento['createdAt'] / 1000 ) : 0;
+
+		$item = rcec_li_construir(
+			'',
+			isset( $elemento['commentary'] ) ? $elemento['commentary'] : '',
+			rcec_li_url_publicacion( $elemento['id'] ),
+			$marca ? gmdate( 'c', $marca ) : '',
+			rcec_li_imagen_desde_api( $elemento ),
+			$elemento['id']
+		);
+
+		if ( $item ) {
+			$items[] = $item;
+		}
+	}
+
+	if ( empty( $items ) ) {
+		return new WP_Error(
+			'rcec_li_api_sin_texto',
+			__( 'Las publicaciones recibidas no tienen texto utilizable.', 'rcec-li' ),
+			array( 'status' => 502 )
+		);
+	}
+
+	return $items;
+}
+
+/**
+ * @param string $token Token de acceso vigente.
+ * @return array Cabeceras que exige la API versionada de LinkedIn.
+ */
+function rcec_li_cabeceras_api( $token ) {
+	return array(
+		'Authorization'             => 'Bearer ' . $token,
+		'LinkedIn-Version'          => RCEC_LI_API_VERSION,
+		'X-Restli-Protocol-Version' => '2.0.0',
+	);
+}
+
+/**
+ * Construye el enlace público a partir del URN de la publicación.
+ *
+ * @param string $urn Por ejemplo urn:li:share:7123456789.
+ * @return string
+ */
+function rcec_li_url_publicacion( $urn ) {
+	// Sin codificar: los dos puntos son legales en un segmento de ruta, es la
+	// forma canónica de LinkedIn, y así el modo «embed» del bloque puede
+	// extraer el identificador numérico del enlace.
+	return 'https://www.linkedin.com/feed/update/' . $urn . '/';
+}
+
+/**
+ * Resuelve la imagen de una publicación.
+ *
+ * La API no entrega una URL directa: entrega el URN del recurso, y hay
+ * que pedirle a otro endpoint la dirección de descarga. Como esa
+ * dirección caduca, se guarda en caché por poco tiempo.
+ *
+ * @param array $elemento Publicación tal como la devuelve la API.
+ * @return string
+ */
+function rcec_li_imagen_desde_api( $elemento ) {
+
+	$urn = '';
+
+	if ( ! empty( $elemento['content']['media']['id'] ) ) {
+		$urn = $elemento['content']['media']['id'];
+	} elseif ( ! empty( $elemento['content']['multiImage']['images'][0]['id'] ) ) {
+		$urn = $elemento['content']['multiImage']['images'][0]['id'];
+	} elseif ( ! empty( $elemento['content']['article']['thumbnail'] ) ) {
+		$urn = $elemento['content']['article']['thumbnail'];
+	}
+
+	if ( ! $urn || 0 !== strpos( $urn, 'urn:li:image:' ) ) {
+		return '';
+	}
+
+	$clave  = 'rcec_li_img_' . md5( $urn );
+	$cache  = get_transient( $clave );
+
+	if ( is_string( $cache ) ) {
+		return $cache;
+	}
+
+	$token = rcec_li_token_valido();
+
+	if ( is_wp_error( $token ) ) {
+		return '';
+	}
+
+	$respuesta = wp_remote_get(
+		'https://api.linkedin.com/rest/images/' . rawurlencode( $urn ),
+		array( 'timeout' => 15, 'headers' => rcec_li_cabeceras_api( $token ) )
+	);
+
+	if ( is_wp_error( $respuesta ) || 200 !== wp_remote_retrieve_response_code( $respuesta ) ) {
+		return '';
+	}
+
+	$datos = json_decode( wp_remote_retrieve_body( $respuesta ), true );
+	$url   = isset( $datos['downloadUrl'] ) ? $datos['downloadUrl'] : '';
+
+	set_transient( $clave, $url, 6 * HOUR_IN_SECONDS );
+
+	return $url;
+}
+
+/**
+ * Devuelve un token de acceso utilizable, renovándolo si está por vencer.
+ *
+ * @return string|WP_Error
+ */
+function rcec_li_token_valido() {
+
+	$guardado = get_option( RCEC_LI_OPCION_TOKEN );
+
+	if ( ! is_array( $guardado ) || empty( $guardado['access'] ) ) {
+		return new WP_Error(
+			'rcec_li_sin_token',
+			__( 'No hay conexión con LinkedIn. Ve a Ajustes → Noticias LinkedIn y pulsa «Conectar con LinkedIn».', 'rcec-li' ),
+			array( 'status' => 500 )
+		);
+	}
+
+	// Margen de un día: renovamos antes de que caduque, no después de fallar.
+	if ( ! empty( $guardado['expira'] ) && $guardado['expira'] < time() + DAY_IN_SECONDS ) {
+		$renovado = rcec_li_renovar_token();
+
+		if ( ! is_wp_error( $renovado ) ) {
+			return $renovado;
+		}
+	}
+
+	return $guardado['access'];
+}
+
+/**
+ * Canjea el refresh token por uno nuevo de acceso.
+ *
+ * @return string|WP_Error
+ */
+function rcec_li_renovar_token() {
+
+	$guardado = get_option( RCEC_LI_OPCION_TOKEN );
+
+	if ( ! is_array( $guardado ) || empty( $guardado['refresh'] ) ) {
+		return new WP_Error(
+			'rcec_li_sin_refresh',
+			__( 'La conexión con LinkedIn caducó y hay que rehacerla desde Ajustes → Noticias LinkedIn.', 'rcec-li' ),
+			array( 'status' => 500 )
+		);
+	}
+
+	$respuesta = wp_remote_post(
+		'https://www.linkedin.com/oauth/v2/accessToken',
+		array(
+			'timeout' => 20,
+			'body'    => array(
+				'grant_type'    => 'refresh_token',
+				'refresh_token' => $guardado['refresh'],
+				'client_id'     => RCEC_LI_CLIENT_ID,
+				'client_secret' => RCEC_LI_CLIENT_SECRET,
+			),
+		)
+	);
+
+	if ( is_wp_error( $respuesta ) || 200 !== wp_remote_retrieve_response_code( $respuesta ) ) {
+		return new WP_Error(
+			'rcec_li_refresh_fallido',
+			__( 'LinkedIn rechazó la renovación del token. Vuelve a conectar desde Ajustes.', 'rcec-li' ),
+			array( 'status' => 502 )
+		);
+	}
+
+	$datos = json_decode( wp_remote_retrieve_body( $respuesta ), true );
+
+	if ( empty( $datos['access_token'] ) ) {
+		return new WP_Error( 'rcec_li_refresh_vacio', __( 'Respuesta inesperada de LinkedIn.', 'rcec-li' ), array( 'status' => 502 ) );
+	}
+
+	rcec_li_guardar_token( $datos, $guardado['refresh'] );
+
+	return $datos['access_token'];
+}
+
+/**
+ * @param array  $datos             Respuesta del endpoint de tokens.
+ * @param string $refresh_anterior  Se conserva si la respuesta no trae uno nuevo.
+ */
+function rcec_li_guardar_token( $datos, $refresh_anterior = '' ) {
+
+	update_option(
+		RCEC_LI_OPCION_TOKEN,
+		array(
+			'access'  => $datos['access_token'],
+			'refresh' => ! empty( $datos['refresh_token'] ) ? $datos['refresh_token'] : $refresh_anterior,
+			'expira'  => time() + ( ! empty( $datos['expires_in'] ) ? (int) $datos['expires_in'] : 60 * DAY_IN_SECONDS ),
+		),
+		false
+	);
+}
+
+/* =========================================================
+   MODO 'ingesta' — un servicio externo empuja las publicaciones
+
+   Deliberadamente genérico: acepta lo que le mande cualquier
+   herramienta. Si mañana cambias de proveedor, aquí no tocas nada.
+========================================================== */
+
+/**
+ * Registra una publicación recibida desde fuera.
+ *
+ * @param array $entrante Datos crudos enviados por el servicio externo.
+ * @return array|WP_Error Estado de la operación.
+ */
+function rcec_li_ingerir( $entrante ) {
+
+	$item = rcec_li_construir(
+		isset( $entrante['titulo'] ) ? $entrante['titulo'] : '',
+		isset( $entrante['texto'] ) ? $entrante['texto'] : '',
+		isset( $entrante['enlace'] ) ? $entrante['enlace'] : '',
+		isset( $entrante['fecha'] ) ? $entrante['fecha'] : '',
+		isset( $entrante['imagen'] ) ? $entrante['imagen'] : '',
+		isset( $entrante['id'] ) ? $entrante['id'] : ''
+	);
+
+	if ( ! $item ) {
+		return new WP_Error(
+			'rcec_li_ingesta_vacia',
+			__( 'La publicación no trae texto utilizable.', 'rcec-li' ),
+			array( 'status' => 400 )
+		);
+	}
+
+	$guardadas = get_option( RCEC_LI_OPCION_INGESTA );
+	$items     = ( is_array( $guardadas ) && ! empty( $guardadas['items'] ) ) ? $guardadas['items'] : array();
+
+	// Reenviar la misma publicación actualiza la existente en vez de duplicarla.
+	$nuevo = true;
+
+	foreach ( $items as $indice => $existente ) {
+		if ( $existente['guid'] === $item['guid'] ) {
+			$items[ $indice ] = $item;
+			$nuevo            = false;
+			break;
+		}
+	}
+
+	if ( $nuevo ) {
+		$items[] = $item;
+	}
+
+	usort(
+		$items,
+		static function ( $a, $b ) {
+			return $b['marca'] <=> $a['marca'];
+		}
+	);
+
+	$items = array_slice( $items, 0, 30 );
+
+	update_option(
+		RCEC_LI_OPCION_INGESTA,
+		array(
+			'actualizado' => time(),
+			'items'       => $items,
+		),
+		false
+	);
+
+	delete_transient( RCEC_LI_CACHE_KEY );
+
+	return array(
+		'estado'  => $nuevo ? 'creada' : 'actualizada',
+		'titulo'  => $item['titulo'],
+		'guardadas' => count( $items ),
+	);
+}
+
+/* =========================================================
    ENDPOINT REST — lo usa el bloque HTML como respaldo
 ========================================================== */
 
@@ -582,8 +1045,89 @@ add_action(
 				),
 			)
 		);
+
+		// Entrada de publicaciones empujadas desde fuera (modo 'ingesta').
+		register_rest_route(
+			'rcec/v1',
+			'/linkedin/ingest',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'permission_callback' => 'rcec_li_permiso_ingesta',
+				'callback'            => static function ( WP_REST_Request $peticion ) {
+
+					$cuerpo = $peticion->get_json_params();
+
+					if ( ! is_array( $cuerpo ) ) {
+						return new WP_Error(
+							'rcec_li_cuerpo_invalido',
+							__( 'Se esperaba un cuerpo JSON.', 'rcec-li' ),
+							array( 'status' => 400 )
+						);
+					}
+
+					// Acepta una publicación suelta o un lote.
+					$lote      = isset( $cuerpo[0] ) ? $cuerpo : array( $cuerpo );
+					$resultado = array();
+
+					foreach ( $lote as $entrante ) {
+						if ( ! is_array( $entrante ) ) {
+							continue;
+						}
+
+						$estado = rcec_li_ingerir( $entrante );
+
+						$resultado[] = is_wp_error( $estado )
+							? array( 'estado' => 'rechazada', 'motivo' => $estado->get_error_message() )
+							: $estado;
+					}
+
+					if ( RCEC_LI_CREAR_ENTRADAS ) {
+						rcec_li_sincronizar_entradas();
+					}
+
+					return rest_ensure_response( array( 'recibidas' => $resultado ) );
+				},
+			)
+		);
 	}
 );
+
+/**
+ * Autoriza la ingesta comparando la contraseña compartida.
+ *
+ * Se acepta por cabecera (preferido) o por parámetro, porque no todos los
+ * servicios permiten definir cabeceras personalizadas.
+ *
+ * @param WP_REST_Request $peticion Petición entrante.
+ * @return bool|WP_Error
+ */
+function rcec_li_permiso_ingesta( WP_REST_Request $peticion ) {
+
+	if ( ! RCEC_LI_TOKEN_INGESTA ) {
+		return new WP_Error(
+			'rcec_li_ingesta_cerrada',
+			__( 'La ingesta está deshabilitada: falta definir RCEC_LI_TOKEN_INGESTA.', 'rcec-li' ),
+			array( 'status' => 403 )
+		);
+	}
+
+	$recibido = $peticion->get_header( 'x_rcec_token' );
+
+	if ( ! $recibido ) {
+		$recibido = $peticion->get_param( 'token' );
+	}
+
+	// hash_equals evita filtrar el token por diferencias de tiempo.
+	if ( ! is_string( $recibido ) || ! hash_equals( RCEC_LI_TOKEN_INGESTA, $recibido ) ) {
+		return new WP_Error(
+			'rcec_li_token_invalido',
+			__( 'Token de ingesta incorrecto.', 'rcec-li' ),
+			array( 'status' => 403 )
+		);
+	}
+
+	return true;
+}
 
 /* =========================================================
    SHORTCODE — [linkedin_noticias cantidad="6"]
@@ -782,3 +1326,255 @@ add_action(
 		}
 	}
 );
+
+/* =========================================================
+   PANTALLA DE ADMINISTRACIÓN
+   Ajustes → Noticias LinkedIn
+========================================================== */
+
+add_action(
+	'admin_menu',
+	static function () {
+		add_options_page(
+			__( 'Noticias LinkedIn', 'rcec-li' ),
+			__( 'Noticias LinkedIn', 'rcec-li' ),
+			'manage_options',
+			'rcec-li',
+			'rcec_li_pantalla_ajustes'
+		);
+	}
+);
+
+/**
+ * @return string URL a la que LinkedIn devuelve al usuario tras autorizar.
+ */
+function rcec_li_url_retorno() {
+	return admin_url( 'options-general.php?page=rcec-li' );
+}
+
+/**
+ * Atiende el retorno de LinkedIn y las acciones de la pantalla.
+ */
+add_action(
+	'admin_init',
+	static function () {
+
+		if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$pagina = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+
+		if ( 'rcec-li' !== $pagina ) {
+			return;
+		}
+
+		// Vuelta desde LinkedIn con el código de autorización.
+		if ( isset( $_GET['code'], $_GET['state'] ) ) {
+
+			$estado = sanitize_text_field( wp_unslash( $_GET['state'] ) );
+
+			// El state impide que un tercero nos haga canjear un código ajeno.
+			if ( ! wp_verify_nonce( $estado, 'rcec_li_oauth' ) ) {
+				add_settings_error( 'rcec-li', 'estado', __( 'La respuesta de LinkedIn no es válida. Intenta conectar de nuevo.', 'rcec-li' ) );
+				return;
+			}
+
+			$respuesta = wp_remote_post(
+				'https://www.linkedin.com/oauth/v2/accessToken',
+				array(
+					'timeout' => 20,
+					'body'    => array(
+						'grant_type'    => 'authorization_code',
+						'code'          => sanitize_text_field( wp_unslash( $_GET['code'] ) ),
+						'redirect_uri'  => rcec_li_url_retorno(),
+						'client_id'     => RCEC_LI_CLIENT_ID,
+						'client_secret' => RCEC_LI_CLIENT_SECRET,
+					),
+				)
+			);
+
+			$datos = is_wp_error( $respuesta )
+				? array()
+				: json_decode( wp_remote_retrieve_body( $respuesta ), true );
+
+			if ( empty( $datos['access_token'] ) ) {
+				add_settings_error( 'rcec-li', 'token', __( 'LinkedIn no entregó el token. Revisa el Client ID, el Client Secret y que la URL de retorno esté registrada tal cual en la app.', 'rcec-li' ) );
+				return;
+			}
+
+			rcec_li_guardar_token( $datos );
+			add_settings_error( 'rcec-li', 'ok', __( 'Conexión con LinkedIn establecida.', 'rcec-li' ), 'success' );
+			return;
+		}
+
+		// Botón «Actualizar ahora».
+		if ( isset( $_GET['rcec_li_accion'] ) && 'sincronizar' === $_GET['rcec_li_accion'] ) {
+
+			check_admin_referer( 'rcec_li_sincronizar_ahora' );
+
+			$datos = rcec_li_obtener_feed( true );
+
+			if ( is_wp_error( $datos ) ) {
+				add_settings_error( 'rcec-li', 'sync', $datos->get_error_message() );
+			} else {
+				$creadas = RCEC_LI_CREAR_ENTRADAS ? rcec_li_sincronizar_entradas() : 0;
+
+				add_settings_error(
+					'rcec-li',
+					'sync',
+					sprintf(
+						/* translators: 1: publicaciones leídas, 2: entradas creadas. */
+						__( 'Listo: %1$d publicaciones disponibles, %2$d entradas nuevas.', 'rcec-li' ),
+						count( $datos['items'] ),
+						$creadas
+					),
+					'success'
+				);
+			}
+		}
+	}
+);
+
+/**
+ * Dibuja la pantalla de ajustes.
+ */
+function rcec_li_pantalla_ajustes() {
+
+	$datos    = rcec_li_obtener_feed();
+	$token    = get_option( RCEC_LI_OPCION_TOKEN );
+	$conectado = is_array( $token ) && ! empty( $token['access'] );
+
+	?>
+	<div class="wrap">
+		<h1><?php esc_html_e( 'Noticias LinkedIn', 'rcec-li' ); ?></h1>
+
+		<?php settings_errors( 'rcec-li' ); ?>
+
+		<h2><?php esc_html_e( 'Estado', 'rcec-li' ); ?></h2>
+		<table class="widefat striped" style="max-width:760px">
+			<tbody>
+				<tr>
+					<th style="width:220px"><?php esc_html_e( 'Modo', 'rcec-li' ); ?></th>
+					<td><code><?php echo esc_html( RCEC_LI_MODO ); ?></code></td>
+				</tr>
+				<tr>
+					<th><?php esc_html_e( 'Publicaciones disponibles', 'rcec-li' ); ?></th>
+					<td>
+						<?php
+						if ( is_wp_error( $datos ) ) {
+							echo '<span style="color:#b32d2e">' . esc_html( $datos->get_error_message() ) . '</span>';
+						} else {
+							printf(
+								/* translators: 1: cantidad, 2: fecha de actualización. */
+								esc_html__( '%1$d, actualizadas el %2$s', 'rcec-li' ),
+								count( $datos['items'] ),
+								esc_html( wp_date( 'j \d\e F, H:i', $datos['actualizado'] ) )
+							);
+
+							if ( ! empty( $datos['obsoleto'] ) ) {
+								echo ' <strong>' . esc_html__( '(copia de respaldo: el origen no responde)', 'rcec-li' ) . '</strong>';
+							}
+						}
+						?>
+					</td>
+				</tr>
+				<tr>
+					<th><?php esc_html_e( 'Entradas reales', 'rcec-li' ); ?></th>
+					<td>
+						<?php
+						echo RCEC_LI_CREAR_ENTRADAS
+							? esc_html( sprintf( __( 'Activadas, se crean como «%s»', 'rcec-li' ), RCEC_LI_ESTADO_ENTRADAS ) )
+							: esc_html__( 'Desactivadas (solo panel)', 'rcec-li' );
+						?>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+
+		<p>
+			<a class="button button-primary"
+			   href="<?php echo esc_url( wp_nonce_url( add_query_arg( 'rcec_li_accion', 'sincronizar', rcec_li_url_retorno() ), 'rcec_li_sincronizar_ahora' ) ); ?>">
+				<?php esc_html_e( 'Actualizar ahora', 'rcec-li' ); ?>
+			</a>
+		</p>
+
+		<?php if ( 'api' === RCEC_LI_MODO ) : ?>
+			<h2><?php esc_html_e( 'Conexión con LinkedIn', 'rcec-li' ); ?></h2>
+
+			<?php if ( ! RCEC_LI_CLIENT_ID || ! RCEC_LI_CLIENT_SECRET ) : ?>
+				<p><?php esc_html_e( 'Falta definir RCEC_LI_CLIENT_ID y RCEC_LI_CLIENT_SECRET en el archivo del plugin.', 'rcec-li' ); ?></p>
+			<?php else : ?>
+				<p>
+					<?php esc_html_e( 'Registra esta URL de retorno en tu app de LinkedIn, exactamente así:', 'rcec-li' ); ?><br>
+					<code><?php echo esc_html( rcec_li_url_retorno() ); ?></code>
+				</p>
+
+				<?php if ( $conectado ) : ?>
+					<p>
+						<?php
+						printf(
+							/* translators: %s: fecha de caducidad del token. */
+							esc_html__( 'Conectado. El permiso vence el %s y se renueva solo.', 'rcec-li' ),
+							esc_html( wp_date( 'j \d\e F, Y', $token['expira'] ) )
+						);
+						?>
+					</p>
+				<?php endif; ?>
+
+				<p>
+					<a class="button"
+					   href="<?php echo esc_url(
+							add_query_arg(
+								array(
+									'response_type' => 'code',
+									'client_id'     => RCEC_LI_CLIENT_ID,
+									'redirect_uri'  => rawurlencode( rcec_li_url_retorno() ),
+									'state'         => wp_create_nonce( 'rcec_li_oauth' ),
+									'scope'         => rawurlencode( 'r_organization_social' ),
+								),
+								'https://www.linkedin.com/oauth/v2/authorization'
+							)
+						); ?>">
+						<?php
+						echo $conectado
+							? esc_html__( 'Reconectar con LinkedIn', 'rcec-li' )
+							: esc_html__( 'Conectar con LinkedIn', 'rcec-li' );
+						?>
+					</a>
+				</p>
+			<?php endif; ?>
+		<?php endif; ?>
+
+		<?php if ( 'ingesta' === RCEC_LI_MODO ) : ?>
+			<h2><?php esc_html_e( 'Recepción de publicaciones', 'rcec-li' ); ?></h2>
+
+			<?php if ( ! RCEC_LI_TOKEN_INGESTA ) : ?>
+				<p><?php esc_html_e( 'Falta definir RCEC_LI_TOKEN_INGESTA en el archivo del plugin. Sin eso, la recepción está cerrada.', 'rcec-li' ); ?></p>
+			<?php else : ?>
+				<p><?php esc_html_e( 'Configura el servicio externo para que envíe una petición POST a:', 'rcec-li' ); ?></p>
+				<p><code><?php echo esc_html( rest_url( 'rcec/v1/linkedin/ingest' ) ); ?></code></p>
+
+				<p><?php esc_html_e( 'Con la cabecera X-RCEC-Token y este cuerpo JSON:', 'rcec-li' ); ?></p>
+				<pre style="background:#f6f7f7;border:1px solid #dcdcde;padding:12px;max-width:760px;overflow:auto">{
+  "id":     "urn:li:share:7123456789",
+  "texto":  "El texto completo de la publicación",
+  "enlace": "https://www.linkedin.com/feed/update/urn:li:share:7123456789/",
+  "fecha":  "2026-09-12T14:30:00Z",
+  "imagen": "https://media.licdn.com/..."
+}</pre>
+
+				<p>
+					<?php esc_html_e( 'Solo «texto» es obligatorio. Reenviar el mismo «id» actualiza la publicación en vez de duplicarla.', 'rcec-li' ); ?>
+				</p>
+			<?php endif; ?>
+		<?php endif; ?>
+
+		<h2><?php esc_html_e( 'Cómo mostrarlas', 'rcec-li' ); ?></h2>
+		<p>
+			<?php esc_html_e( 'Bloque HTML personalizado con el archivo linkedin-noticias.html, o bien este shortcode:', 'rcec-li' ); ?>
+			<code>[linkedin_noticias cantidad="6" columnas="3"]</code>
+		</p>
+	</div>
+	<?php
+}

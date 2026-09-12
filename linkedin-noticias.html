@@ -730,8 +730,12 @@
   }
 
   // El identificador numérico de la publicación habilita el iframe oficial.
+  // Se decodifica primero por si el enlace trae el URN percent-codificado
+  // (share%3A en vez de share:), como hacen algunos puentes.
   function extraerURN(enlace) {
-    var coincidencia = String(enlace).match(/(?:activity[:\-]|share[:\-]|ugcPost[:\-])(\d{10,})/i);
+    var texto = String(enlace || "");
+    try { texto = decodeURIComponent(texto); } catch (e) { /* enlace mal formado: seguimos con el original */ }
+    var coincidencia = texto.match(/(?:activity|share|ugcPost)[:\-](\d{10,})/i);
     return coincidencia ? coincidencia[1] : "";
   }
 

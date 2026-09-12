@@ -42,40 +42,84 @@ LinkedIn ──► Puente (genera un feed) ──► WordPress ──► Panel e
 
 ## Paso 1: elegir el puente
 
-### Opción A — Zapier o Make *(recomendada)*
+### Zapier no sirve para esto
 
-La vía oficial. Usa el conector **LinkedIn Pages**, que accede con permiso real
-a tu página. Requiere ser **administrador** de la página de empresa.
+Conviene descartarlo de entrada, y no por el precio: **Zapier no tiene ningún
+disparador para LinkedIn**. Su integración solo ofrece acciones para *publicar
+en* LinkedIn; no puede *leer de* LinkedIn. No existe un "cuando aparezca una
+publicación nueva en mi página".
 
-1. Crea una cuenta en [Make](https://www.make.com) o [Zapier](https://zapier.com).
-2. Conecta tu cuenta de LinkedIn y autoriza la página de la Red Chilena.
-3. Disparador: *New Post on Company Page* / *Nueva publicación*.
-4. Acción: enviar los datos a WordPress, a una hoja de cálculo publicada como
-   JSON, o a cualquier destino que entregue una URL fija.
+Aparte, su plan gratuito tampoco daría: son Zaps de dos pasos, 100 tareas al
+mes, y los webhooks son función de pago.
 
-Ventaja: es estable y no se rompe. Ambos tienen plan gratuito suficiente para
-revisar cada hora.
+Zapier sí serviría para el camino inverso —escribir la noticia en WordPress y
+que se publique sola en LinkedIn—, que es gratis y automático. Si algún día
+prefieres que el sitio sea el original y LinkedIn la copia, ese camino está
+abierto.
 
-### Opción B — RSS.app o similar *(la más rápida de montar)*
+### Modo `api` — WordPress le pregunta directo a LinkedIn *(el único gratis para siempre)*
 
-Servicios que generan un feed RSS/JSON a partir de una página de LinkedIn.
+Sin intermediarios ni suscripciones. WordPress consulta la API oficial con tus
+propias credenciales.
 
-1. Entra a [rss.app](https://rss.app) → *New Feed* → **LinkedIn**.
-2. Pega la URL de la página:
-   `https://www.linkedin.com/company/red-chilena-por-la-educación-del-carácter/`
-3. Copia la URL del feed que te entrega (termina en `.json` o `.xml`).
+1. Crea una app en [developer.linkedin.com](https://developer.linkedin.com),
+   asociada a la página de la Red Chilena.
+2. Agrega el producto **Community Management API** y completa el formulario de
+   acceso. Piden nombre legal, dirección, sitio web y política de privacidad.
+3. Espera la aprobación: entre dos y cuatro semanas.
+4. En el plugin, pon `RCEC_LI_MODO` en `'api'` y completa `RCEC_LI_ORG_ID`,
+   `RCEC_LI_CLIENT_ID` y `RCEC_LI_CLIENT_SECRET`.
+5. Entra a **Ajustes → Noticias LinkedIn** y pulsa *Conectar con LinkedIn*.
 
-Ventaja: cinco minutos y funciona. Desventaja: es de pago (~USD 10/mes) y
-depende de que el servicio mantenga su acceso.
+Quien autorice debe ser **administrador** de la página. El permiso se renueva
+solo; si alguna vez caduca del todo, la pantalla te avisa y basta reconectar.
 
-### Opción C — API oficial de LinkedIn
+- **A favor:** gratis y permanente, sin depender de terceros.
+- **En contra:** el trámite de aprobación, que puede demorar o ser rechazado.
 
-La **Community Management API** entrega las publicaciones de tu propia página.
-Requiere postular al programa de desarrolladores y que aprueben la solicitud
-(semanas). Solo vale la pena si el sitio es de alto tráfico.
+### Modo `ingesta` — que un servicio externo empuje las publicaciones
 
-> Cualquiera de las tres termina igual: **una URL de feed**. Eso es lo único
-> que necesitas para el paso 2.
+WordPress abre una dirección de entrada y **cualquier** herramienta puede
+enviarle publicaciones. No quedas atado a ningún proveedor: si mañana cambias
+de servicio, en WordPress no tocas nada.
+
+1. En el plugin, pon `RCEC_LI_MODO` en `'ingesta'` e inventa una contraseña
+   larga para `RCEC_LI_TOKEN_INGESTA`.
+2. Entra a **Ajustes → Noticias LinkedIn**: ahí aparece la dirección exacta y
+   el formato del envío.
+3. Configura el servicio para que envíe un POST a esa dirección con la cabecera
+   `X-RCEC-Token` cada vez que publiques algo.
+
+El servicio que tiene el disparador que necesitas es **[Make](https://www.make.com)**,
+con el módulo *Watch Company Posts* de LinkedIn. Su plan gratuito **no lo pude
+verificar** —su página de precios está bloqueada desde donde trabajo y las
+fuentes secundarias se contradicen entre sí sobre cuántas operaciones consume
+una revisión que no encuentra nada—. Compruébalo tú al registrarte: si el plan
+gratuito no alcanza, revisa cada hora en vez de cada 15 minutos, que para un
+panel de noticias es de sobra.
+
+Reenviar la misma publicación **la actualiza en vez de duplicarla**, así que no
+pasa nada si el servicio manda algo dos veces.
+
+### Modo `feed` — leer una URL de RSS o JSON
+
+Para servicios tipo [rss.app](https://rss.app), que generan un feed a partir de
+la página de LinkedIn. Cinco minutos de configuración, pero es de pago
+(~USD 10/mes) y depende de que mantengan su acceso.
+
+Pon `RCEC_LI_MODO` en `'feed'` y la URL en `RCEC_LI_FEED`.
+
+### En resumen
+
+| Modo | Costo | Esfuerzo inicial | Depende de |
+|---|---|---|---|
+| `api` | Gratis, permanente | Alto (aprobación de LinkedIn) | Nadie |
+| `ingesta` | Según el servicio | Medio | El puente que elijas |
+| `feed` | ~USD 10/mes | Bajo | El proveedor del feed |
+
+> **Sugerencia:** parte en `ingesta` para tener el panel funcionando pronto, y
+> postula en paralelo a la API. Cuando te aprueben, cambias una línea y te
+> desconectas del intermediario para siempre.
 
 ---
 
@@ -109,14 +153,15 @@ por la URL del paso 1. Guarda y listo.
 Los colores se cambian en el bloque `<style>`, en las variables que empiezan
 con `--rcec-li-`.
 
-### 2.2 El puente de servidor (opcional, recomendado)
+### 2.2 El plugin de servidor
+
+Necesario en los modos `api` e `ingesta`; opcional pero recomendado en `feed`.
 
 Sube `linkedin-noticias-proxy.php` a `wp-content/mu-plugins/` (crea la carpeta
-si no existe). Se activa solo. Edita arriba del archivo:
-
-```php
-define( 'RCEC_LI_FEED', 'PEGA-AQUI-LA-URL-DE-TU-FEED' );
-```
+si no existe). Se activa solo. Edita el bloque de configuración de arriba según
+el modo que hayas elegido en el paso 1, y revisa **Ajustes → Noticias LinkedIn**,
+que te muestra el estado, la dirección de entrada y un botón para actualizar a
+mano.
 
 Qué agrega:
 
