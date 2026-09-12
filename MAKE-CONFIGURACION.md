@@ -82,10 +82,24 @@ En [make.com](https://www.make.com) → **Create a new scenario**.
 
 ### Módulo 1 — LinkedIn: Watch Company Posts
 
-1. Busca **LinkedIn** y elige el disparador **Watch Company Posts**.
-2. *Create a connection* → autoriza con la cuenta que sea **administradora** de
-   la página. Si no lo eres, pídeselo a quien administre la página: sin ese rol
-   LinkedIn no entrega las publicaciones.
+1. Busca **LinkedIn** y elige el disparador que vigile las publicaciones de la
+   página (*Watch Company Posts* o equivalente).
+2. *Create a connection*. Make ofrece **dos métodos de conexión** y aquí se
+   pierde mucha gente:
+
+   | Método | Para qué sirve |
+   |---|---|
+   | **LinkedIn** | El que necesitas. Da acceso a organizaciones y publicaciones. |
+   | **LinkedIn (OpenID Connect)** | Solo identifica quién eres. **No sirve**: no da acceso a las publicaciones de la página. |
+
+   Elige **LinkedIn**, el primero.
+
+3. Autoriza con la cuenta que sea **administradora** de la página. Si no lo
+   eres, pídeselo a quien administre la página: sin ese rol LinkedIn no entrega
+   las publicaciones.
+
+   La documentación de Make solo exige *tener una cuenta de LinkedIn*: no pide
+   LinkedIn Premium ni ningún plan de pago de LinkedIn.
 3. **Organization / Company Page**: elige Red Chilena por la Educación del Carácter.
 4. **Limit**: `5`. Suficiente, y evita gastar operaciones de más.
 
