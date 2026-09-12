@@ -1,0 +1,963 @@
+<!-- =========================================================
+     NOTICIAS DESDE LINKEDIN — BLOQUE HTML PERSONALIZADO
+     Red Chilena por la Educación del Carácter
+
+     CÓMO SE USA
+     1. En WordPress agrega un bloque "HTML personalizado".
+     2. Pega TODO este archivo dentro del bloque.
+     3. Edita únicamente el objeto CONFIG (más abajo).
+        No necesitas tocar nada más.
+
+     QUÉ RESUELVE
+     - Detecta el título aunque las publicaciones de LinkedIn
+       no tengan título (heurística de primera frase).
+     - Normaliza la fecha a español y la muestra relativa.
+     - Extrae la imagen de la publicación con varios métodos
+       y usa un marcador propio si no hay ninguna.
+     - Limpia los artefactos típicos del feed ("hashtag#",
+       URLs cortadas, emojis sueltos, saltos dobles).
+     - Guarda una copia en caché: si el feed se cae, el panel
+       sigue mostrando las últimas noticias en vez de vaciarse.
+========================================================== -->
+
+<div class="rcec-li" id="rcec-li" aria-busy="true">
+  <h2 class="rcec-li__sr-only">Últimas publicaciones en LinkedIn</h2>
+  <div class="rcec-li__grid" data-rcec-li-grid></div>
+  <div class="rcec-li__pie" data-rcec-li-pie hidden></div>
+</div>
+
+<style>
+  .rcec-li {
+    /* ---- Paleta: cambia estos valores y cambia todo el bloque ---- */
+    --rcec-li-acento: #0A66C2;        /* azul LinkedIn */
+    --rcec-li-tinta: #14212B;         /* texto principal */
+    --rcec-li-tinta-suave: #5B6B78;   /* texto secundario */
+    --rcec-li-linea: #E3E7EA;         /* bordes */
+    --rcec-li-tarjeta: #FFFFFF;       /* fondo de tarjeta */
+    --rcec-li-hueso: #F4F6F8;         /* fondo de imagen vacía */
+    --rcec-li-radio: 14px;
+    --rcec-li-fuente: "DM Sans", "Helvetica Neue", Arial, sans-serif;
+    --rcec-li-columnas: 3;
+
+    width: 100%;
+    margin: 0 auto;
+    padding: 0;
+    font-family: var(--rcec-li-fuente);
+    color: var(--rcec-li-tinta);
+
+    /* Neutraliza fondos y bordes que imponga el tema de WordPress */
+    background-color: transparent !important;
+    background-image: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .rcec-li,
+  .rcec-li *,
+  .rcec-li *::before,
+  .rcec-li *::after { box-sizing: border-box; }
+
+  .rcec-li__sr-only {
+    position: absolute !important;
+    width: 1px !important; height: 1px !important;
+    padding: 0 !important; margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+  }
+
+  /* =========================================================
+     GRILLA
+     auto-fit + minmax evita media queries: las tarjetas se
+     reacomodan solas según el ancho real del contenedor.
+  ========================================================== */
+
+  .rcec-li__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 22px;
+    align-items: stretch;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rcec-li[data-columnas="1"] .rcec-li__grid { grid-template-columns: 1fr; }
+  .rcec-li[data-columnas="2"] .rcec-li__grid { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+
+  /* =========================================================
+     TARJETA
+  ========================================================== */
+
+  .rcec-li__item {
+    display: flex;
+    flex-direction: column;
+    background: var(--rcec-li-tarjeta);
+    border: 1px solid var(--rcec-li-linea);
+    border-radius: var(--rcec-li-radio);
+    overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  }
+
+  .rcec-li__item:hover,
+  .rcec-li__item:focus-within {
+    transform: translateY(-3px);
+    border-color: var(--rcec-li-acento);
+    box-shadow: 0 10px 26px rgba(20, 33, 43, .10);
+  }
+
+  .rcec-li__media {
+    position: relative;
+    display: block;
+    aspect-ratio: 16 / 9;
+    background: var(--rcec-li-hueso);
+    overflow: hidden;
+  }
+
+  .rcec-li__media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    max-width: 100%;
+  }
+
+  /* Marcador cuando la publicación no trae imagen */
+  .rcec-li__media--vacia {
+    display: grid;
+    place-items: center;
+    background:
+      radial-gradient(circle at 30% 20%, rgba(10,102,194,.14), transparent 60%),
+      var(--rcec-li-hueso);
+  }
+
+  .rcec-li__marca {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--rcec-li-tinta-suave);
+    text-align: center;
+    padding: 0 18px;
+    line-height: 1.5;
+  }
+
+  .rcec-li__cuerpo {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    gap: 10px;
+    padding: 18px 20px 20px;
+  }
+
+  .rcec-li__meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    color: var(--rcec-li-tinta-suave);
+    font-weight: 500;
+  }
+
+  .rcec-li__meta svg {
+    width: 15px;
+    height: 15px;
+    flex: 0 0 auto;
+    fill: var(--rcec-li-acento);
+  }
+
+  .rcec-li__punto {
+    width: 3px; height: 3px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: .55;
+    flex: 0 0 auto;
+  }
+
+  .rcec-li__titulo {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.32;
+    font-weight: 700;
+    letter-spacing: -.01em;
+    color: var(--rcec-li-tinta);
+  }
+
+  .rcec-li__titulo a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* El enlace cubre la tarjeta completa, pero los hashtags
+     y el botón siguen siendo clicables por encima (z-index). */
+  .rcec-li__titulo a::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+
+  .rcec-li__item { position: relative; }
+
+  .rcec-li__titulo a:hover,
+  .rcec-li__titulo a:focus-visible { color: var(--rcec-li-acento); }
+
+  .rcec-li__resumen {
+    margin: 0;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--rcec-li-tinta-suave);
+  }
+
+  .rcec-li__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 2px 0 0;
+    padding: 0;
+    list-style: none;
+    position: relative;
+    z-index: 2;
+  }
+
+  .rcec-li__tag {
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: rgba(10, 102, 194, .08);
+    color: var(--rcec-li-acento);
+    white-space: nowrap;
+  }
+
+  .rcec-li__accion {
+    margin-top: auto;
+    padding-top: 12px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--rcec-li-acento);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .rcec-li__accion svg {
+    width: 14px; height: 14px;
+    fill: currentColor;
+    transition: transform .18s ease;
+  }
+
+  .rcec-li__item:hover .rcec-li__accion svg { transform: translateX(3px); }
+
+  /* =========================================================
+     MODO EMBED OFICIAL
+     Usa el iframe propio de LinkedIn: fidelidad total de
+     formato, a costa de no poder aplicarle estilos.
+  ========================================================== */
+
+  .rcec-li__embed {
+    width: 100%;
+    border: 1px solid var(--rcec-li-linea);
+    border-radius: var(--rcec-li-radio);
+    overflow: hidden;
+    background: var(--rcec-li-tarjeta);
+  }
+
+  .rcec-li__embed iframe {
+    display: block;
+    width: 100%;
+    height: 560px;
+    border: 0;
+  }
+
+  /* =========================================================
+     ESTADOS: CARGANDO / ERROR / PIE
+  ========================================================== */
+
+  .rcec-li__esqueleto {
+    border: 1px solid var(--rcec-li-linea);
+    border-radius: var(--rcec-li-radio);
+    overflow: hidden;
+    background: var(--rcec-li-tarjeta);
+  }
+
+  .rcec-li__esqueleto-media { aspect-ratio: 16 / 9; }
+
+  .rcec-li__brillo {
+    background: linear-gradient(90deg, #EEF1F3 25%, #F7F9FA 37%, #EEF1F3 63%);
+    background-size: 400% 100%;
+    animation: rcec-li-brillo 1.4s ease infinite;
+  }
+
+  .rcec-li__esqueleto-linea {
+    height: 12px;
+    border-radius: 6px;
+    margin: 14px 20px 0;
+  }
+
+  .rcec-li__esqueleto-linea:last-child { margin-bottom: 22px; width: 55%; }
+
+  @keyframes rcec-li-brillo {
+    0%   { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rcec-li__brillo { animation: none; }
+    .rcec-li__item { transition: none; }
+  }
+
+  .rcec-li__aviso {
+    grid-column: 1 / -1;
+    padding: 22px;
+    border: 1px dashed var(--rcec-li-linea);
+    border-radius: var(--rcec-li-radio);
+    text-align: center;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--rcec-li-tinta-suave);
+  }
+
+  .rcec-li__aviso a { color: var(--rcec-li-acento); font-weight: 600; }
+
+  .rcec-li__pie {
+    margin-top: 24px;
+    text-align: center;
+  }
+
+  .rcec-li__boton {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 22px;
+    border-radius: 999px;
+    background: var(--rcec-li-acento);
+    color: #FFFFFF !important;
+    font-size: 14.5px;
+    font-weight: 600;
+    text-decoration: none !important;
+    transition: opacity .18s ease;
+  }
+
+  .rcec-li__boton:hover { opacity: .88; }
+  .rcec-li__boton svg { width: 16px; height: 16px; fill: currentColor; }
+
+  .rcec-li__actualizado {
+    margin: 10px 0 0;
+    font-size: 12px;
+    color: var(--rcec-li-tinta-suave);
+  }
+</style>
+
+<script>
+(function () {
+  "use strict";
+
+  /* =========================================================
+     CONFIGURACIÓN — ESTO ES LO ÚNICO QUE DEBES EDITAR
+  ========================================================== */
+
+  var CONFIG = {
+
+    // URL del feed de tus publicaciones de LinkedIn.
+    // Se genera con un puente tipo RSS.app, Make o Zapier.
+    // Acepta JSON o RSS/XML indistintamente.
+    feed: "PEGA-AQUI-LA-URL-DE-TU-FEED",
+
+    // Respaldo del lado del servidor (opcional pero recomendado).
+    // Si instalas linkedin-noticias-proxy.php, deja esta línea tal cual:
+    // resuelve el bloqueo CORS y acelera la carga.
+    proxy: "/wp-json/rcec/v1/linkedin",
+
+    // "tarjeta" = diseño propio, integrado a tu sitio (recomendado)
+    // "embed"   = iframe oficial de LinkedIn, formato idéntico al original
+    modo: "tarjeta",
+
+    maximo: 6,             // cuántas publicaciones mostrar
+    columnas: 3,           // 1, 2 o 3
+    mostrarImagen: true,
+    mostrarHashtags: true,
+    mostrarFechaRelativa: true,
+
+    largoTitulo: 90,       // caracteres antes de cortar el título
+    largoResumen: 200,     // caracteres del resumen
+
+    cacheMinutos: 30,      // cada cuánto vuelve a consultar el feed
+
+    // Enlace del botón inferior. Déjalo vacío ("") para ocultarlo.
+    paginaLinkedIn: "https://www.linkedin.com/company/red-chilena-por-la-educaci%C3%B3n-del-car%C3%A1cter/",
+
+    // Texto del marcador cuando una publicación no trae imagen.
+    marcaSinImagen: "Red Chilena por la Educación del Carácter",
+
+    textos: {
+      boton: "Ver más en LinkedIn",
+      accion: "Leer publicación",
+      sinFeed: "Falta configurar la URL del feed. Abre el bloque HTML y reemplaza el valor de <strong>feed</strong>.",
+      error: "No pudimos cargar las publicaciones en este momento.",
+      vacio: "Todavía no hay publicaciones para mostrar.",
+      actualizado: "Actualizado"
+    }
+  };
+
+  /* =========================================================
+     A PARTIR DE AQUÍ NO NECESITAS MODIFICAR NADA
+  ========================================================== */
+
+  var raiz = document.getElementById("rcec-li");
+  if (!raiz) { return; }
+
+  var grid = raiz.querySelector("[data-rcec-li-grid]");
+  var pie  = raiz.querySelector("[data-rcec-li-pie]");
+  var CLAVE_CACHE = "rcec-li-cache:" + CONFIG.feed;
+
+  raiz.setAttribute("data-columnas", String(CONFIG.columnas));
+  raiz.style.setProperty("--rcec-li-columnas", String(CONFIG.columnas));
+
+  /* ---------- Utilidades de texto ---------- */
+
+  function decodificar(texto) {
+    var caja = document.createElement("textarea");
+    caja.innerHTML = texto || "";
+    return caja.value;
+  }
+
+  function aTextoPlano(html) {
+    if (!html) { return ""; }
+    var doc = new DOMParser().parseFromString(
+      "<div>" + html + "</div>", "text/html"
+    );
+    // <br> y </p> deben convertirse en saltos reales, no desaparecer:
+    // la primera línea es la mejor pista para el título.
+    doc.querySelectorAll("br").forEach(function (br) {
+      br.replaceWith("\n");
+    });
+    doc.querySelectorAll("p, div").forEach(function (bloque) {
+      bloque.append("\n");
+    });
+    return doc.body.textContent || "";
+  }
+
+  // El feed de LinkedIn arrastra artefactos conocidos. Los quitamos
+  // antes de cualquier análisis para no ensuciar título ni resumen.
+  function limpiar(texto) {
+    return (texto || "")
+      .replace(/\r/g, "")
+      .replace(/hashtag#/gi, "#")            // "hashtag#Educación" -> "#Educación"
+      .replace(/https?:\/\/\S+/g, " ")       // URLs sueltas
+      .replace(/lnkd\.in\/\S+/gi, " ")
+      .replace(/[​-‍﻿]/g, "") // caracteres invisibles
+      .replace(/[ \t]+/g, " ")
+      .replace(/\n{2,}/g, "\n")
+      .trim();
+  }
+
+  // Quita emojis y viñetas decorativas al inicio de una línea:
+  // "🎓 Cerramos el ciclo..." -> "Cerramos el ciclo..."
+  function quitarAdornoInicial(texto) {
+    return (texto || "")
+      .replace(/^[\s\p{Extended_Pictographic}←-⇿☀-➿•·▶►–—-]+/u, "")
+      .trim();
+  }
+
+  function soloHashtags(linea) {
+    var limpio = (linea || "").trim();
+    if (!limpio) { return true; }
+    return limpio.split(/\s+/).every(function (palabra) {
+      return palabra.charAt(0) === "#" || palabra.charAt(0) === "@";
+    });
+  }
+
+  function cortar(texto, limite) {
+    if (!texto) { return ""; }
+    if (texto.length <= limite) { return texto; }
+    var recorte = texto.slice(0, limite);
+    var espacio = recorte.lastIndexOf(" ");
+    // Cortamos en palabra completa, nunca a mitad de una.
+    if (espacio > limite * 0.6) { recorte = recorte.slice(0, espacio); }
+    return recorte.replace(/[\s,;:.\-–—]+$/, "") + "…";
+  }
+
+  /* ---------- El núcleo: deducir un título ----------
+     Las publicaciones de LinkedIn no tienen título. Por eso
+     los plugins genéricos muestran un párrafo entero o la
+     palabra "Sin título". Estrategia, en orden:
+       1. Si el feed trae un título limpio y corto, se usa.
+       2. Si no, la primera línea con contenido real.
+       3. Si esa línea es larga, su primera frase.
+       4. Como último recurso, la fecha.
+  ------------------------------------------------------ */
+
+  function deducirTitulo(tituloFeed, texto, fecha) {
+    var candidato = limpiar(decodificar(tituloFeed || ""));
+    candidato = quitarAdornoInicial(candidato);
+
+    var pareceGenerico = /^(sin t[ií]tulo|untitled|linkedin|publicaci[oó]n)$/i.test(candidato);
+    var pareceCortado  = candidato.length > CONFIG.largoTitulo * 1.6;
+
+    if (candidato && !pareceGenerico && !pareceCortado && !soloHashtags(candidato)) {
+      return cortar(candidato, CONFIG.largoTitulo);
+    }
+
+    var lineas = limpiar(texto).split("\n");
+    var primera = "";
+    for (var i = 0; i < lineas.length; i++) {
+      var linea = quitarAdornoInicial(lineas[i]);
+      if (linea.length >= 12 && !soloHashtags(linea)) { primera = linea; break; }
+    }
+
+    if (!primera) {
+      return fecha
+        ? "Publicación del " + formatearFecha(fecha)
+        : "Publicación en LinkedIn";
+    }
+
+    if (primera.length <= CONFIG.largoTitulo) {
+      return primera.replace(/[.:;,\s]+$/, "");
+    }
+
+    // Primera frase completa, si cabe.
+    // Evitamos lookbehind a propósito: Safari anterior a 16.4 no lo
+    // soporta y el error de sintaxis anularía el bloque entero.
+    var frase = (primera.match(/^[\s\S]*?[.!?…](?:\s|$)/) || [])[0];
+    if (frase) { frase = frase.trim(); }
+    if (frase && frase.length <= CONFIG.largoTitulo) {
+      return frase.replace(/[.\s]+$/, "");
+    }
+
+    return cortar(primera, CONFIG.largoTitulo);
+  }
+
+  // El resumen no debe repetir el título ni arrastrar los hashtags.
+  function deducirResumen(texto, titulo) {
+    // Primero descartamos las líneas de puro hashtag y el adorno inicial.
+    // Si no, el texto empieza por "🎓 " o por "#Comunicado" y deja de
+    // coincidir con el título, que sí venía limpio: el resumen acabaría
+    // repitiendo el título entero.
+    var lineas = limpiar(texto)
+      .split("\n")
+      .filter(function (linea) { return !soloHashtags(linea); });
+
+    if (lineas.length) { lineas[0] = quitarAdornoInicial(lineas[0]); }
+
+    var cuerpo = lineas.join(" ");
+    var base = titulo.replace(/…$/, "").trim();
+
+    if (base && cuerpo.toLowerCase().indexOf(base.toLowerCase()) === 0) {
+      cuerpo = cuerpo.slice(base.length);
+    }
+
+    var sinTitulo = cuerpo
+      .replace(/#[\p{L}\p{N}_]+/gu, "")
+      .replace(/\s{2,}/g, " ")
+      .replace(/^[\s.:;,\-–—]+/, "")
+      .trim();
+
+    return cortar(sinTitulo, CONFIG.largoResumen);
+  }
+
+  function extraerHashtags(texto) {
+    var encontrados = limpiar(texto).match(/#[\p{L}\p{N}_]+/gu) || [];
+    var vistos = {};
+    var unicos = [];
+    encontrados.forEach(function (etiqueta) {
+      var clave = etiqueta.toLowerCase();
+      if (!vistos[clave]) { vistos[clave] = true; unicos.push(etiqueta); }
+    });
+    return unicos.slice(0, 4);
+  }
+
+  /* ---------- Fechas ---------- */
+
+  function formatearFecha(iso) {
+    var fecha = new Date(iso);
+    if (isNaN(fecha.getTime())) { return ""; }
+    return fecha.toLocaleDateString("es-CL", {
+      day: "numeric", month: "long", year: "numeric"
+    });
+  }
+
+  function fechaRelativa(iso) {
+    var fecha = new Date(iso);
+    if (isNaN(fecha.getTime())) { return ""; }
+
+    var segundos = Math.floor((Date.now() - fecha.getTime()) / 1000);
+    if (segundos < 60)    { return "hace instantes"; }
+    if (segundos < 3600)  { return "hace " + Math.floor(segundos / 60) + " min"; }
+    if (segundos < 86400) {
+      var horas = Math.floor(segundos / 3600);
+      return "hace " + horas + (horas === 1 ? " hora" : " horas");
+    }
+    var dias = Math.floor(segundos / 86400);
+    if (dias === 1)  { return "ayer"; }
+    if (dias < 7)    { return "hace " + dias + " días"; }
+    if (dias < 31)   {
+      var semanas = Math.floor(dias / 7);
+      return "hace " + semanas + (semanas === 1 ? " semana" : " semanas");
+    }
+    if (dias < 365)  {
+      var meses = Math.floor(dias / 30);
+      return "hace " + meses + (meses === 1 ? " mes" : " meses");
+    }
+    return formatearFecha(iso);
+  }
+
+  /* ---------- Imágenes ----------
+     Cada puente entrega la imagen en un lugar distinto.
+     Probamos todas las ubicaciones conocidas, en orden.
+  ------------------------------------------------------ */
+
+  function extraerImagenJSON(item) {
+    var candidatos = [
+      item.image, item.thumbnail, item.banner_image, item.image_url,
+      item.enclosure && item.enclosure.link,
+      item.enclosure && item.enclosure.url,
+      item.media && item.media.thumbnail && item.media.thumbnail.url,
+      item.attachments && item.attachments[0] && item.attachments[0].url
+    ];
+    for (var i = 0; i < candidatos.length; i++) {
+      if (typeof candidatos[i] === "string" && /^https?:\/\//.test(candidatos[i])) {
+        return candidatos[i];
+      }
+    }
+    return extraerImagenHTML(item.content_html || item.description || item.content || "");
+  }
+
+  function extraerImagenHTML(html) {
+    if (!html) { return ""; }
+    var doc = new DOMParser().parseFromString(html, "text/html");
+    var img = doc.querySelector("img");
+    var src = img ? (img.getAttribute("src") || "") : "";
+    // Los píxeles de seguimiento de 1x1 no sirven como portada.
+    if (/1x1|pixel|spacer|tracking/i.test(src)) { return ""; }
+    return /^https?:\/\//.test(src) ? src : "";
+  }
+
+  /* ---------- Lectura del feed ---------- */
+
+  function etiquetaNS(nodo, nombre) {
+    var lista = nodo.getElementsByTagNameNS("*", nombre);
+    return lista.length ? lista[0] : null;
+  }
+
+  function textoDe(nodo, nombre) {
+    var hijo = etiquetaNS(nodo, nombre);
+    return hijo ? (hijo.textContent || "").trim() : "";
+  }
+
+  function parsearRSS(xml) {
+    var doc = new DOMParser().parseFromString(xml, "text/xml");
+    if (doc.querySelector("parsererror")) { throw new Error("XML inválido"); }
+
+    var nodos = doc.getElementsByTagName("item");
+    if (!nodos.length) { nodos = doc.getElementsByTagName("entry"); }
+
+    return Array.prototype.map.call(nodos, function (nodo) {
+      var enlace = textoDe(nodo, "link");
+      if (!enlace) {
+        var alterno = nodo.querySelector("link[href]");
+        enlace = alterno ? alterno.getAttribute("href") : "";
+      }
+
+      var contenido = textoDe(nodo, "encoded") ||
+                      textoDe(nodo, "description") ||
+                      textoDe(nodo, "content") ||
+                      textoDe(nodo, "summary");
+
+      var imagen = "";
+      var media = etiquetaNS(nodo, "content") || etiquetaNS(nodo, "thumbnail");
+      if (media && media.getAttribute("url")) { imagen = media.getAttribute("url"); }
+      if (!imagen) {
+        var adjunto = nodo.getElementsByTagName("enclosure")[0];
+        if (adjunto) { imagen = adjunto.getAttribute("url") || ""; }
+      }
+      if (!imagen) { imagen = extraerImagenHTML(contenido); }
+
+      return {
+        titulo: textoDe(nodo, "title"),
+        contenido: contenido,
+        enlace: enlace,
+        fecha: textoDe(nodo, "pubDate") ||
+               textoDe(nodo, "published") ||
+               textoDe(nodo, "updated") ||
+               textoDe(nodo, "date"),
+        imagen: imagen
+      };
+    });
+  }
+
+  function parsearJSON(datos) {
+    var lista = Array.isArray(datos) ? datos
+              : datos.items    ? datos.items
+              : datos.entries  ? datos.entries
+              : datos.posts    ? datos.posts
+              : [];
+
+    return lista.map(function (item) {
+      return {
+        titulo: item.title || item.titulo || "",
+        contenido: item.content_html || item.description || item.content_text ||
+                   item.content || item.texto || item.summary || "",
+        enlace: item.url || item.link || item.enlace || item.permalink || "",
+        fecha: item.date_published || item.pubDate || item.published ||
+               item.date || item.fecha || item.created_at || "",
+        imagen: extraerImagenJSON(item)
+      };
+    });
+  }
+
+  // Normaliza cualquier origen a la forma que usa el render.
+  function normalizar(crudos) {
+    return crudos.map(function (crudo) {
+      var plano  = aTextoPlano(crudo.contenido) || crudo.titulo || "";
+      var fecha  = crudo.fecha ? new Date(crudo.fecha).toISOString() : "";
+      var titulo = deducirTitulo(crudo.titulo, plano, fecha);
+
+      return {
+        titulo: titulo,
+        resumen: deducirResumen(plano, titulo),
+        hashtags: extraerHashtags(plano),
+        enlace: crudo.enlace || CONFIG.paginaLinkedIn,
+        fecha: fecha,
+        imagen: crudo.imagen || "",
+        urn: extraerURN(crudo.enlace || "")
+      };
+    })
+    .filter(function (item) { return item.titulo; })
+    .sort(function (a, b) { return (b.fecha || "").localeCompare(a.fecha || ""); })
+    .slice(0, CONFIG.maximo);
+  }
+
+  // El identificador numérico de la publicación habilita el iframe oficial.
+  function extraerURN(enlace) {
+    var coincidencia = String(enlace).match(/(?:activity[:\-]|share[:\-]|ugcPost[:\-])(\d{10,})/i);
+    return coincidencia ? coincidencia[1] : "";
+  }
+
+  /* ---------- Caché ----------
+     Doble propósito: evita pedir el feed en cada visita y
+     mantiene el panel con contenido si el feed falla.
+  ------------------------------------------------------ */
+
+  function leerCache() {
+    try {
+      var guardado = window.localStorage.getItem(CLAVE_CACHE);
+      return guardado ? JSON.parse(guardado) : null;
+    } catch (e) { return null; }
+  }
+
+  function guardarCache(items) {
+    try {
+      window.localStorage.setItem(CLAVE_CACHE, JSON.stringify({
+        momento: Date.now(),
+        items: items
+      }));
+    } catch (e) { /* modo privado o almacenamiento lleno: seguimos sin caché */ }
+  }
+
+  function cacheVigente(cache) {
+    if (!cache || !cache.items || !cache.items.length) { return false; }
+    return (Date.now() - cache.momento) < CONFIG.cacheMinutos * 60 * 1000;
+  }
+
+  /* ---------- Descarga ---------- */
+
+  function descargar(url) {
+    return fetch(url, { credentials: "omit" }).then(function (respuesta) {
+      if (!respuesta.ok) { throw new Error("HTTP " + respuesta.status); }
+      var tipo = respuesta.headers.get("content-type") || "";
+      return respuesta.text().then(function (cuerpo) {
+        var pareceJSON = tipo.indexOf("json") !== -1 ||
+                         /^\s*[[{]/.test(cuerpo);
+        if (pareceJSON) {
+          try { return parsearJSON(JSON.parse(cuerpo)); }
+          catch (e) { /* venía mal etiquetado: probamos como XML */ }
+        }
+        return parsearRSS(cuerpo);
+      });
+    });
+  }
+
+  function obtenerPublicaciones() {
+    var directo = descargar(CONFIG.feed);
+
+    if (!CONFIG.proxy) { return directo; }
+
+    // Si el navegador bloquea el feed por CORS, reintentamos
+    // a través del proxy de WordPress, que no tiene esa restricción.
+    return directo.catch(function () {
+      var separador = CONFIG.proxy.indexOf("?") === -1 ? "?" : "&";
+      return descargar(CONFIG.proxy + separador + "feed=" + encodeURIComponent(CONFIG.feed));
+    });
+  }
+
+  /* ---------- Render ---------- */
+
+  var ICONO_LINKEDIN =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.35V9h3.41v1.56h.05a3.74 3.74 0 0 1 3.37-1.85c3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.07 2.07 0 1 1 0-4.13 2.07 2.07 0 0 1 0 4.13zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z"/></svg>';
+
+  var ICONO_FLECHA =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.2 5.4 11.8 6.8l4.2 4.2H4v2h12l-4.2 4.2 1.4 1.4 6.6-6.6z"/></svg>';
+
+  function escapar(texto) {
+    return String(texto)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function pintarEsqueleto() {
+    var piezas = [];
+    for (var i = 0; i < Math.min(CONFIG.maximo, CONFIG.columnas); i++) {
+      piezas.push(
+        '<div class="rcec-li__esqueleto">' +
+          '<div class="rcec-li__esqueleto-media rcec-li__brillo"></div>' +
+          '<div class="rcec-li__esqueleto-linea rcec-li__brillo"></div>' +
+          '<div class="rcec-li__esqueleto-linea rcec-li__brillo"></div>' +
+          '<div class="rcec-li__esqueleto-linea rcec-li__brillo"></div>' +
+        '</div>'
+      );
+    }
+    grid.innerHTML = piezas.join("");
+  }
+
+  function pintarAviso(mensaje) {
+    raiz.setAttribute("aria-busy", "false");
+    grid.innerHTML = '<div class="rcec-li__aviso" role="status">' + mensaje + '</div>';
+  }
+
+  function pintarTarjeta(item) {
+    var media = "";
+    if (CONFIG.mostrarImagen) {
+      media = item.imagen
+        ? '<div class="rcec-li__media">' +
+            '<img src="' + escapar(item.imagen) + '" alt="" loading="lazy" decoding="async">' +
+          '</div>'
+        : '<div class="rcec-li__media rcec-li__media--vacia">' +
+            '<span class="rcec-li__marca">' + escapar(CONFIG.marcaSinImagen) + '</span>' +
+          '</div>';
+    }
+
+    var sello = CONFIG.mostrarFechaRelativa
+      ? fechaRelativa(item.fecha)
+      : formatearFecha(item.fecha);
+
+    var meta = '<p class="rcec-li__meta">' + ICONO_LINKEDIN + '<span>LinkedIn</span>';
+    if (sello) {
+      meta += '<span class="rcec-li__punto"></span>' +
+              '<time datetime="' + escapar(item.fecha) + '" title="' +
+              escapar(formatearFecha(item.fecha)) + '">' + escapar(sello) + '</time>';
+    }
+    meta += '</p>';
+
+    var tags = "";
+    if (CONFIG.mostrarHashtags && item.hashtags.length) {
+      tags = '<ul class="rcec-li__tags">' + item.hashtags.map(function (etiqueta) {
+        return '<li class="rcec-li__tag">' + escapar(etiqueta) + '</li>';
+      }).join("") + '</ul>';
+    }
+
+    var resumen = item.resumen
+      ? '<p class="rcec-li__resumen">' + escapar(item.resumen) + '</p>'
+      : '';
+
+    return '<article class="rcec-li__item">' +
+      media +
+      '<div class="rcec-li__cuerpo">' +
+        meta +
+        '<h3 class="rcec-li__titulo">' +
+          '<a href="' + escapar(item.enlace) + '" target="_blank" rel="noopener noreferrer">' +
+            escapar(item.titulo) +
+          '</a>' +
+        '</h3>' +
+        resumen +
+        tags +
+        '<span class="rcec-li__accion">' + escapar(CONFIG.textos.accion) + ICONO_FLECHA + '</span>' +
+      '</div>' +
+    '</article>';
+  }
+
+  function pintarEmbed(item) {
+    if (!item.urn) { return pintarTarjeta(item); }
+    return '<div class="rcec-li__embed">' +
+      '<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:' +
+        escapar(item.urn) + '" ' +
+        'title="' + escapar(item.titulo) + '" ' +
+        'loading="lazy" frameborder="0" allowfullscreen></iframe>' +
+    '</div>';
+  }
+
+  function pintarPie(momento) {
+    if (!CONFIG.paginaLinkedIn) { return; }
+    var sello = momento
+      ? '<p class="rcec-li__actualizado">' + escapar(CONFIG.textos.actualizado) + " " +
+        escapar(fechaRelativa(new Date(momento).toISOString())) + '</p>'
+      : '';
+    pie.innerHTML =
+      '<a class="rcec-li__boton" href="' + escapar(CONFIG.paginaLinkedIn) + '" ' +
+        'target="_blank" rel="noopener noreferrer">' +
+        ICONO_LINKEDIN + escapar(CONFIG.textos.boton) +
+      '</a>' + sello;
+    pie.hidden = false;
+  }
+
+  function pintar(items, momento) {
+    raiz.setAttribute("aria-busy", "false");
+
+    if (!items.length) { return pintarAviso(CONFIG.textos.vacio); }
+
+    grid.innerHTML = items.map(function (item) {
+      return CONFIG.modo === "embed" ? pintarEmbed(item) : pintarTarjeta(item);
+    }).join("");
+
+    pintarPie(momento);
+  }
+
+  /* ---------- Arranque ---------- */
+
+  function iniciar() {
+    if (!CONFIG.feed || CONFIG.feed.indexOf("PEGA-AQUI") === 0) {
+      return pintarAviso(CONFIG.textos.sinFeed);
+    }
+
+    var cache = leerCache();
+
+    // Mostramos la caché de inmediato: el panel nunca aparece vacío.
+    if (cache && cache.items && cache.items.length) {
+      pintar(cache.items, cache.momento);
+      if (cacheVigente(cache)) { return; }
+    } else {
+      pintarEsqueleto();
+    }
+
+    obtenerPublicaciones()
+      .then(function (crudos) {
+        var items = normalizar(crudos);
+        if (!items.length) { throw new Error("feed sin publicaciones"); }
+        guardarCache(items);
+        pintar(items, Date.now());
+      })
+      .catch(function (error) {
+        if (window.console) {
+          console.warn("[rcec-li] No se pudo actualizar el feed:", error.message);
+        }
+        // Si había caché ya está en pantalla; solo avisamos cuando no hay nada.
+        if (!cache || !cache.items || !cache.items.length) {
+          pintarAviso(
+            CONFIG.textos.error +
+            (CONFIG.paginaLinkedIn
+              ? ' <a href="' + escapar(CONFIG.paginaLinkedIn) +
+                '" target="_blank" rel="noopener noreferrer">Ver en LinkedIn</a>'
+              : "")
+          );
+        }
+      });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", iniciar);
+  } else {
+    iniciar();
+  }
+})();
+</script>
