@@ -1,0 +1,437 @@
+<!-- =========================================================
+     NOTICIAS DESDE LINKEDIN — VERSIÓN SIMPLE
+     Red Chilena por la Educación del Carácter
+
+     CÓMO SE USA (tres pasos, sin instalar nada)
+
+     1. En WordPress, agrega un bloque "HTML personalizado"
+        y pega TODO este archivo dentro.
+
+     2. Para agregar una noticia: en LinkedIn abre la
+        publicación, pulsa los tres puntos (···) y elige
+        "Copiar enlace de la publicación".
+
+     3. Pega ese enlace en la lista de aquí abajo, en una
+        línea nueva. Guarda la página. Listo.
+
+     Para quitar una noticia, borra su línea.
+     El orden de la lista es el orden en que aparecen.
+
+     No hay nada más que configurar.
+========================================================== -->
+
+
+<!-- ⬇⬇⬇  PEGA AQUÍ LOS ENLACES, UNO POR LÍNEA  ⬇⬇⬇ -->
+
+<script type="text/plain" id="rcec-lis-enlaces">
+
+https://www.linkedin.com/feed/update/urn:li:activity:0000000000000000000/
+
+</script>
+
+<!-- ⬆⬆⬆  FIN DE LA LISTA DE ENLACES  ⬆⬆⬆ -->
+
+
+<div class="rcec-lis" id="rcec-lis">
+  <h2 class="rcec-lis__sr-only">Últimas publicaciones en LinkedIn</h2>
+  <div class="rcec-lis__grid" data-rcec-lis-grid></div>
+  <div class="rcec-lis__pie" data-rcec-lis-pie hidden></div>
+</div>
+
+<style>
+  .rcec-lis {
+    /* ---- Ajustes rápidos: cambia estos valores ---- */
+    --rcec-lis-columnas: 3;      /* 1, 2 o 3 tarjetas por fila */
+    --rcec-lis-alto: 560px;      /* alto de cada publicación */
+    --rcec-lis-separacion: 22px; /* espacio entre tarjetas */
+
+    --rcec-lis-acento: #0A66C2;
+    --rcec-lis-linea: #E3E7EA;
+    --rcec-lis-tinta: #14212B;
+    --rcec-lis-suave: #5B6B78;
+    --rcec-lis-fondo: #FFFFFF;
+    --rcec-lis-radio: 14px;
+    --rcec-lis-fuente: "DM Sans", "Helvetica Neue", Arial, sans-serif;
+
+    width: 100%;
+    margin: 0 auto;
+    padding: 0;
+    font-family: var(--rcec-lis-fuente);
+    color: var(--rcec-lis-tinta);
+
+    /* Neutraliza fondos y bordes que imponga el tema de WordPress */
+    background-color: transparent !important;
+    background-image: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .rcec-lis,
+  .rcec-lis *,
+  .rcec-lis *::before,
+  .rcec-lis *::after { box-sizing: border-box; }
+
+  .rcec-lis__sr-only {
+    position: absolute !important;
+    width: 1px !important; height: 1px !important;
+    padding: 0 !important; margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+  }
+
+  /* =========================================================
+     GRILLA
+     auto-fit + minmax: las tarjetas se reacomodan solas según
+     el ancho disponible, sin necesidad de media queries.
+  ========================================================== */
+
+  .rcec-lis__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--rcec-lis-separacion);
+    align-items: start;
+  }
+
+  .rcec-lis[data-columnas="1"] .rcec-lis__grid {
+    grid-template-columns: 1fr;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+
+  .rcec-lis[data-columnas="2"] .rcec-lis__grid {
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  }
+
+  /* =========================================================
+     TARJETA
+     El contenido lo dibuja LinkedIn dentro del iframe: aquí
+     solo ponemos el marco para que combine con el sitio.
+  ========================================================== */
+
+  .rcec-lis__item {
+    display: flex;
+    flex-direction: column;
+    background: var(--rcec-lis-fondo);
+    border: 1px solid var(--rcec-lis-linea);
+    border-radius: var(--rcec-lis-radio);
+    overflow: hidden;
+    transition: border-color .18s ease, box-shadow .18s ease;
+  }
+
+  .rcec-lis__item:hover,
+  .rcec-lis__item:focus-within {
+    border-color: var(--rcec-lis-acento);
+    box-shadow: 0 8px 22px rgba(20, 33, 43, .09);
+  }
+
+  .rcec-lis__marco {
+    position: relative;
+    width: 100%;
+    height: var(--rcec-lis-alto);
+    background: #F4F6F8;
+  }
+
+  .rcec-lis__marco iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    border: 0;
+  }
+
+  /* Se ve mientras LinkedIn carga, y queda debajo si no carga. */
+  .rcec-lis__cargando {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    text-align: center;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--rcec-lis-suave);
+    background: #F4F6F8;
+  }
+
+  .rcec-lis__marco iframe { position: relative; z-index: 1; }
+
+  /* Pie con el enlace directo: red de seguridad si el
+     visitante no puede ver el contenido incrustado. */
+  .rcec-lis__enlace {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--rcec-lis-linea);
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--rcec-lis-acento);
+    text-decoration: none;
+  }
+
+  .rcec-lis__enlace:hover { text-decoration: underline; }
+
+  .rcec-lis__enlace svg {
+    width: 15px; height: 15px;
+    flex: 0 0 auto;
+    fill: currentColor;
+  }
+
+  /* =========================================================
+     AVISOS
+     Solo aparecen si la lista está vacía o tiene una línea
+     que no se entiende. Sirven de ayuda al editar.
+  ========================================================== */
+
+  .rcec-lis__aviso {
+    grid-column: 1 / -1;
+    padding: 20px 22px;
+    border: 1px dashed var(--rcec-lis-linea);
+    border-radius: var(--rcec-lis-radio);
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--rcec-lis-suave);
+    text-align: center;
+  }
+
+  .rcec-lis__aviso strong { color: var(--rcec-lis-tinta); }
+
+  .rcec-lis__aviso code {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    background: #F4F6F8;
+    padding: 2px 6px;
+    border-radius: 4px;
+    word-break: break-all;
+  }
+
+  /* =========================================================
+     PIE
+  ========================================================== */
+
+  .rcec-lis__pie {
+    margin-top: 26px;
+    text-align: center;
+  }
+
+  .rcec-lis__boton {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 22px;
+    border-radius: 999px;
+    background: var(--rcec-lis-acento);
+    color: #FFFFFF !important;
+    font-size: 14.5px;
+    font-weight: 600;
+    text-decoration: none !important;
+  }
+
+  .rcec-lis__boton:hover { opacity: .88; }
+  .rcec-lis__boton svg { width: 16px; height: 16px; fill: currentColor; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rcec-lis__item { transition: none; }
+  }
+</style>
+
+<script>
+(function () {
+  "use strict";
+
+  /* =========================================================
+     AJUSTES OPCIONALES
+     Puedes dejarlos tal cual. Los colores y el alto se
+     cambian arriba, en el bloque <style>.
+  ========================================================== */
+
+  var CONFIG = {
+    // Enlace del botón del final. Déjalo en "" para ocultarlo.
+    paginaLinkedIn: "https://www.linkedin.com/company/red-chilena-por-la-educaci%C3%B3n-del-car%C3%A1cter/",
+    textoBoton: "Ver más en LinkedIn",
+    textoEnlace: "Ver publicación en LinkedIn",
+    textoCargando: "Cargando la publicación…"
+  };
+
+  /* =========================================================
+     A PARTIR DE AQUÍ NO NECESITAS MODIFICAR NADA
+  ========================================================== */
+
+  var raiz = document.getElementById("rcec-lis");
+  var deposito = document.getElementById("rcec-lis-enlaces");
+  if (!raiz || !deposito) { return; }
+
+  var grid = raiz.querySelector("[data-rcec-lis-grid]");
+  var pie = raiz.querySelector("[data-rcec-lis-pie]");
+
+  var ICONO_LI =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.35V9h3.41v1.56h.05a3.74 3.74 0 0 1 3.37-1.85c3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.07 2.07 0 1 1 0-4.13 2.07 2.07 0 0 1 0 4.13zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z"/></svg>';
+
+  function escapar(texto) {
+    return String(texto)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  /* ---------- Lectura de la lista ----------
+     El depósito es <script type="text/plain">: el navegador no
+     interpreta su contenido, así que pegar ahí no puede romper
+     nada de la página. Se lee como texto y se parte por líneas.
+  ------------------------------------------------------------ */
+
+  function leerLineas() {
+    return (deposito.textContent || "")
+      .split("\n")
+      .map(function (linea) { return linea.trim(); })
+      .filter(function (linea) {
+        // Ignora líneas vacías y comentarios sueltos.
+        return linea && linea.charAt(0) !== "#" && linea.indexOf("//") !== 0;
+      });
+  }
+
+  /* ---------- Interpretación de cada línea ----------
+     Se aceptan las tres formas en que alguien puede traer una
+     publicación desde LinkedIn, para que ninguna falle:
+
+       1. El enlace copiado con "Copiar enlace de la publicación"
+          .../posts/empresa_texto-activity-7123456789-AbCd/
+       2. El enlace de la barra de direcciones
+          .../feed/update/urn:li:activity:7123456789/
+       3. El código completo que da "Insertar esta publicación"
+          <iframe src="https://www.linkedin.com/embed/..." ...>
+  ------------------------------------------------------------ */
+
+  function interpretar(linea) {
+    var texto = linea;
+
+    // Caso 3: viene pegado el iframe completo. Sacamos el src.
+    var iframe = texto.match(/src\s*=\s*["']([^"']+)["']/i);
+    if (iframe) { texto = iframe[1]; }
+
+    // Si ya es una dirección de incrustación, se usa tal cual.
+    if (/linkedin\.com\/embed\//i.test(texto)) {
+      return { incrustar: texto, original: enlaceDesdeEmbed(texto) };
+    }
+
+    var descifrado = texto;
+    try { descifrado = decodeURIComponent(texto); } catch (e) { /* enlace raro: seguimos con el original */ }
+
+    // Se conserva el tipo que declara el enlace (activity, share o
+    // ugcPost). Reemplazarlo por otro hace que LinkedIn no encuentre
+    // la publicación, así que no inventamos.
+    var conTipo = descifrado.match(/(activity|share|ugcPost)[:\-](\d{10,})/i);
+    if (conTipo) {
+      return {
+        incrustar: direccionEmbed(conTipo[1], conTipo[2]),
+        original: linea
+      };
+    }
+
+    // Último recurso: un número largo suelto en el enlace.
+    // El enlace que se copia desde LinkedIn es del tipo "activity".
+    var soloNumero = descifrado.match(/(\d{15,})/);
+    if (soloNumero && /linkedin\.com/i.test(descifrado)) {
+      return {
+        incrustar: direccionEmbed("activity", soloNumero[1]),
+        original: linea
+      };
+    }
+
+    return null;
+  }
+
+  function direccionEmbed(tipo, id) {
+    // LinkedIn distingue mayúsculas en "ugcPost".
+    var normalizado = tipo.toLowerCase() === "ugcpost" ? "ugcPost" : tipo.toLowerCase();
+    return "https://www.linkedin.com/embed/feed/update/urn:li:" + normalizado + ":" + id;
+  }
+
+  function enlaceDesdeEmbed(direccion) {
+    return direccion.replace("/embed/feed/update/", "/feed/update/");
+  }
+
+  /* ---------- Dibujado ---------- */
+
+  function tarjeta(item, indice) {
+    return '<article class="rcec-lis__item">' +
+      '<div class="rcec-lis__marco">' +
+        '<p class="rcec-lis__cargando">' + escapar(CONFIG.textoCargando) + '</p>' +
+        // Sin scrolling="no": una publicación larga se corta y no habría
+        // forma de leer el resto. Es preferible poder desplazarla dentro
+        // del marco a perder contenido.
+        '<iframe src="' + escapar(item.incrustar) + '" ' +
+          'title="Publicación ' + (indice + 1) + ' de LinkedIn" ' +
+          'loading="lazy" frameborder="0" allowfullscreen></iframe>' +
+      '</div>' +
+      '<a class="rcec-lis__enlace" href="' + escapar(item.original) + '" ' +
+        'target="_blank" rel="noopener noreferrer">' +
+        ICONO_LI + escapar(CONFIG.textoEnlace) +
+      '</a>' +
+    '</article>';
+  }
+
+  function aviso(mensaje) {
+    return '<div class="rcec-lis__aviso">' + mensaje + '</div>';
+  }
+
+  function dibujar() {
+    var lineas = leerLineas();
+    var validas = [];
+    var invalidas = [];
+
+    lineas.forEach(function (linea) {
+      // El enlace de ejemplo que viene de fábrica no se muestra.
+      if (/0000000000000000000/.test(linea)) { return; }
+
+      var item = interpretar(linea);
+      if (item) { validas.push(item); } else { invalidas.push(linea); }
+    });
+
+    var partes = validas.map(tarjeta);
+
+    if (!validas.length) {
+      partes.push(aviso(
+        '<strong>Todavía no hay publicaciones.</strong><br>' +
+        'Abre este bloque y pega el enlace de una publicación de LinkedIn ' +
+        'en la lista de arriba, en una línea nueva.'
+      ));
+    }
+
+    // Si una línea no se entiende, se dice cuál: así se corrige
+    // sin tener que adivinar qué pasó.
+    invalidas.forEach(function (linea) {
+      partes.push(aviso(
+        '<strong>No se reconoció este enlace:</strong><br>' +
+        '<code>' + escapar(linea.slice(0, 120)) + '</code><br>' +
+        'Usa el que entrega «Copiar enlace de la publicación» en LinkedIn.'
+      ));
+    });
+
+    grid.innerHTML = partes.join("");
+
+    // Retira el mensaje de carga en cuanto LinkedIn responde. Si nunca
+    // responde —porque el visitante usa un bloqueador que impide cargar
+    // contenido de LinkedIn— el mensaje se queda, y el enlace del pie
+    // sigue llevando a la publicación.
+    grid.querySelectorAll("iframe").forEach(function (marco) {
+      marco.addEventListener("load", function () {
+        var mensaje = marco.parentNode.querySelector(".rcec-lis__cargando");
+        if (mensaje) { mensaje.remove(); }
+      });
+    });
+
+    if (validas.length && CONFIG.paginaLinkedIn) {
+      pie.innerHTML =
+        '<a class="rcec-lis__boton" href="' + escapar(CONFIG.paginaLinkedIn) + '" ' +
+          'target="_blank" rel="noopener noreferrer">' +
+          ICONO_LI + escapar(CONFIG.textoBoton) +
+        '</a>';
+      pie.hidden = false;
+    }
+  }
+
+  dibujar();
+})();
+</script>
